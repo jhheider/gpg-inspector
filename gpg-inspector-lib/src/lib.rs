@@ -5,6 +5,9 @@ pub mod lookup;
 pub mod packet;
 pub mod stream;
 
+// Re-export lookup module for tests
+pub use lookup::*;
+
 use std::sync::Arc;
 
 pub use armor::{decode_armor, ArmorResult};

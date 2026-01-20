@@ -145,9 +145,6 @@ fn parse_packet(stream: &mut ByteStream) -> Result<Packet> {
     let body = parse_packet_body(tag, &mut body_stream, &mut colors, &mut fields, body_start)?;
 
     colors.byte_colors.truncate(packet_end);
-    if colors.byte_colors.len() < packet_end {
-        colors.byte_colors.resize(packet_end, None);
-    }
 
     Ok(Packet {
         start: packet_start,
