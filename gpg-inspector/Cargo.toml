@@ -5,6 +5,9 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
 [dependencies]
 gpg-inspector-lib = { path = "../gpg-inspector-lib" }
 ratatui = "0.29"

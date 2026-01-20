@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, PanelFocus};
-use crate::ui::{data_panel, get_data_panel_area, get_hex_panel_area, hex_panel};
+use crate::ui::{data_panel, get_data_panel_area};
 use ratatui::layout::Rect;
 
 pub fn handle_event(app: &mut App, event: Event, size: Rect) {
@@ -42,7 +42,6 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
         KeyCode::BackTab => {
             app.focus = match app.focus {
                 PanelFocus::Input => PanelFocus::Data,
-                PanelFocus::Hex => PanelFocus::Input,
                 PanelFocus::Data => PanelFocus::Input,
             };
         }
@@ -51,7 +50,6 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
         }
         _ => match app.focus {
             PanelFocus::Input => handle_input_key(app, key),
-            PanelFocus::Hex => handle_hex_key(app, key, size),
             PanelFocus::Data => handle_data_key(app, key, size),
         },
     }
@@ -82,36 +80,6 @@ fn handle_input_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Enter => {
             app.insert_char('\n');
-        }
-        _ => {}
-    }
-}
-
-fn handle_hex_key(app: &mut App, key: KeyEvent, size: Rect) {
-    let hex_area = get_hex_panel_area(size);
-    let visible_lines = hex_panel::hex_panel_visible_lines(hex_area);
-    let bytes_per_line = 16;
-    let total_lines = app.raw_bytes.len().div_ceil(bytes_per_line);
-    let max_scroll = total_lines.saturating_sub(visible_lines);
-
-    match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
-            app.hex_scroll = app.hex_scroll.saturating_sub(1);
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.hex_scroll = (app.hex_scroll + 1).min(max_scroll);
-        }
-        KeyCode::PageUp => {
-            app.hex_scroll = app.hex_scroll.saturating_sub(visible_lines);
-        }
-        KeyCode::PageDown => {
-            app.hex_scroll = (app.hex_scroll + visible_lines).min(max_scroll);
-        }
-        KeyCode::Home => {
-            app.hex_scroll = 0;
-        }
-        KeyCode::End => {
-            app.hex_scroll = max_scroll;
         }
         _ => {}
     }

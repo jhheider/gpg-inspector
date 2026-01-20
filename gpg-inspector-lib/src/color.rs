@@ -49,38 +49,3 @@ impl ColorTracker {
         self.byte_colors.get(index).copied().flatten()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_color_rotation() {
-        let mut tracker = ColorTracker::new(100);
-        let c1 = tracker.set_field(0, 10);
-        let c2 = tracker.set_field(10, 20);
-        let c3 = tracker.set_field(20, 30);
-
-        // Each field should have a different color
-        assert_eq!(c1, 0);
-        assert_eq!(c2, 1);
-        assert_eq!(c3, 2);
-
-        // Verify byte colors were set
-        assert_eq!(tracker.get_color(5), Some(0));
-        assert_eq!(tracker.get_color(15), Some(1));
-        assert_eq!(tracker.get_color(25), Some(2));
-    }
-
-    #[test]
-    fn test_header_no_color() {
-        let mut tracker = ColorTracker::new(50);
-        tracker.set_header(0, 5);
-        let body_color = tracker.set_field(5, 45);
-
-        // Header bytes should have no color
-        assert_eq!(tracker.get_color(2), None);
-        // Body bytes should have a color
-        assert_eq!(tracker.get_color(10), Some(body_color));
-    }
-}

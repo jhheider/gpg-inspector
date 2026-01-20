@@ -5,7 +5,6 @@ use gpg_inspector_lib::{Field, Packet};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelFocus {
     Input,
-    Hex,
     Data,
 }
 
@@ -13,7 +12,6 @@ impl PanelFocus {
     pub fn next(self) -> Self {
         match self {
             PanelFocus::Input => PanelFocus::Data,
-            PanelFocus::Hex => PanelFocus::Data,
             PanelFocus::Data => PanelFocus::Input,
         }
     }

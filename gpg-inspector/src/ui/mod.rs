@@ -13,6 +13,8 @@ use data_panel::DataPanel;
 use hex_panel::HexPanel;
 use input_panel::InputPanel;
 
+/// Requires Frame which needs terminal backend
+#[cfg(not(tarpaulin_include))]
 pub fn draw(frame: &mut Frame, app: &App) {
     let size = frame.area();
 

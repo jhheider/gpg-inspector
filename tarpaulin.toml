@@ -1,8 +1,8 @@
 # Tarpaulin configuration
 [default]
-packages = ["gpg-inspector-lib"]
+workspace = true
 engine = "Llvm"
 all-features = true
-exclude-files = ["gpg-inspector-lib/tests/*"]
+exclude-files = ["gpg-inspector/tests/*", "gpg-inspector-lib/tests/*"]
 output-dir = "coverage"
 out = ["Lcov", "Html"]

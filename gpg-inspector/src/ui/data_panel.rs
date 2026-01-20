@@ -14,11 +14,15 @@ pub struct DataPanel<'a> {
 }
 
 impl<'a> DataPanel<'a> {
+    /// Only used by excluded Widget impl
+    #[cfg(not(tarpaulin_include))]
     pub fn new(app: &'a App) -> Self {
         Self { app }
     }
 }
 
+/// Renders to terminal buffer - not unit testable
+#[cfg(not(tarpaulin_include))]
 impl Widget for DataPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let focused = self.app.focus == PanelFocus::Data;

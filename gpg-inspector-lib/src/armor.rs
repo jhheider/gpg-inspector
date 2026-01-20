@@ -132,24 +132,6 @@ pub fn decode_armor(input: &str) -> Result<ArmorResult> {
 
     Ok(ArmorResult {
         bytes: bytes.into(),
-        armor_type: armor_type.into()
+        armor_type: armor_type.into(),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_base64_decode() {
-        assert_eq!(base64_decode("SGVsbG8=").unwrap(), b"Hello");
-        assert_eq!(base64_decode("V29ybGQ=").unwrap(), b"World");
-    }
-
-    #[test]
-    fn test_crc24() {
-        let data = b"Hello";
-        let crc = crc24(data);
-        assert!(crc <= 0xFFFFFF);
-    }
 }

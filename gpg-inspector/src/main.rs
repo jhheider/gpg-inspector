@@ -1,7 +1,3 @@
-mod app;
-mod event;
-mod ui;
-
 use std::io::{IsTerminal, Read};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -15,7 +11,8 @@ use crossterm::{
 };
 use ratatui::{Terminal, backend::CrosstermBackend, layout::Rect};
 
-use app::App;
+use gpg_inspector::app::App;
+use gpg_inspector::{event, ui};
 
 /// Interactive GPG/OpenPGP packet inspector
 #[derive(Parser)]
@@ -31,6 +28,8 @@ struct Cli {
     file: Option<PathBuf>,
 }
 
+/// Requires TTY for terminal setup/teardown
+#[cfg(not(tarpaulin_include))]
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -64,6 +63,8 @@ fn main() -> Result<()> {
     result
 }
 
+/// Requires stdin/file I/O mocking
+#[cfg(not(tarpaulin_include))]
 fn load_initial_input(cli: &Cli) -> Result<Option<String>> {
     // File takes precedence
     if let Some(path) = &cli.file {
@@ -86,6 +87,8 @@ fn load_initial_input(cli: &Cli) -> Result<Option<String>> {
     Ok(None)
 }
 
+/// Requires TTY for terminal event loop
+#[cfg(not(tarpaulin_include))]
 fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
     loop {
         terminal.draw(|f| ui::draw(f, app))?;
