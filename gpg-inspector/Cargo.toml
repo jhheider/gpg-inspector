@@ -1,0 +1,13 @@
+[package]
+name = "gpg-inspector"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+gpg-inspector-lib = { path = "../gpg-inspector-lib" }
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["use-dev-tty"] }
+anyhow = "1.0.100"
+clap = { version = "4.5.54", features = ["derive"] }

@@ -1,0 +1,10 @@
+[package]
+name = "gpg-inspector-lib"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror = "2.0"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
