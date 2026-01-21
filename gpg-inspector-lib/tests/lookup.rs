@@ -347,3 +347,44 @@ fn test_aead_algorithm_all_values() {
     // Unknown
     assert!(lookup_aead_algorithm(99).name.contains("Unknown"));
 }
+
+// ============================================================================
+// V6 Signature Salt Length - all branches
+// ============================================================================
+
+#[test]
+fn test_v6_signature_salt_len() {
+    // SHA-256: 16 bytes
+    assert_eq!(get_v6_signature_salt_len(8), 16);
+    // SHA3-256: 16 bytes
+    assert_eq!(get_v6_signature_salt_len(12), 16);
+    // SHA-384: 24 bytes
+    assert_eq!(get_v6_signature_salt_len(9), 24);
+    // SHA-512: 32 bytes
+    assert_eq!(get_v6_signature_salt_len(10), 32);
+    // SHA3-512: 32 bytes
+    assert_eq!(get_v6_signature_salt_len(14), 32);
+    // Unknown/other: defaults to 16 bytes
+    assert_eq!(get_v6_signature_salt_len(1), 16); // MD5
+    assert_eq!(get_v6_signature_salt_len(2), 16); // SHA-1
+    assert_eq!(get_v6_signature_salt_len(99), 16); // Unknown
+}
+
+// ============================================================================
+// Raw Signature Length - all branches
+// ============================================================================
+
+#[test]
+fn test_raw_signature_len() {
+    // Ed25519: 64 bytes
+    assert_eq!(get_raw_signature_len(27), Some(64));
+    // Ed448: 114 bytes
+    assert_eq!(get_raw_signature_len(28), Some(114));
+    // Other algorithms use MPI-encoded signatures
+    assert_eq!(get_raw_signature_len(1), None); // RSA
+    assert_eq!(get_raw_signature_len(17), None); // DSA
+    assert_eq!(get_raw_signature_len(19), None); // ECDSA
+    assert_eq!(get_raw_signature_len(22), None); // EdDSA (legacy)
+    assert_eq!(get_raw_signature_len(25), None); // X25519 (encryption only)
+    assert_eq!(get_raw_signature_len(26), None); // X448 (encryption only)
+}

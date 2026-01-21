@@ -98,6 +98,16 @@ pub enum KeyMaterial {
         /// 32-byte public key.
         public_key: String,
     },
+    /// X448 public key (algorithm 26, RFC 9580).
+    X448 {
+        /// 56-byte public key.
+        public_key: String,
+    },
+    /// Ed448 public key (algorithm 28, RFC 9580).
+    Ed448 {
+        /// 57-byte public key.
+        public_key: String,
+    },
     /// Unknown or unsupported algorithm.
     Unknown {
         /// Raw key material bytes.
@@ -123,6 +133,19 @@ pub fn parse_public_key(
         (version_start, version_end),
     ));
 
+    match version {
+        6 => parse_public_key_v6(stream, version, fields, offset),
+        _ => parse_public_key_v4(stream, version, fields, offset),
+    }
+}
+
+/// Parses a V4 public key packet body.
+fn parse_public_key_v4(
+    stream: &mut ByteStream,
+    version: u8,
+    fields: &mut Vec<Field>,
+    offset: usize,
+) -> Result<PublicKeyPacket> {
     let time_start = offset + stream.pos();
     let creation_time = stream.uint32()?;
     let time_end = offset + stream.pos();
@@ -151,6 +174,73 @@ pub fn parse_public_key(
         22 => parse_eddsa_key(stream, fields, offset)?,
         25 => parse_x25519_key(stream, fields, offset)?,
         27 => parse_ed25519_key(stream, fields, offset)?,
+        _ => {
+            let data = stream.rest();
+            KeyMaterial::Unknown { data }
+        }
+    };
+
+    Ok(PublicKeyPacket {
+        version,
+        creation_time,
+        algorithm,
+        key_material,
+    })
+}
+
+/// Parses a V6 public key packet body (RFC 9580).
+///
+/// V6 keys have:
+/// - 4-byte creation time
+/// - 1-byte algorithm
+/// - 4-byte key material length (new in V6)
+/// - Algorithm-specific key material
+fn parse_public_key_v6(
+    stream: &mut ByteStream,
+    version: u8,
+    fields: &mut Vec<Field>,
+    offset: usize,
+) -> Result<PublicKeyPacket> {
+    let time_start = offset + stream.pos();
+    let creation_time = stream.uint32()?;
+    let time_end = offset + stream.pos();
+    fields.push(Field::field(
+        "Creation Time",
+        format_timestamp(creation_time)?,
+        (time_start, time_end),
+    ));
+
+    let algo_start = offset + stream.pos();
+    let algorithm = stream.octet()?;
+    let algo_end = offset + stream.pos();
+    let algo_info = lookup_public_key_algorithm(algorithm);
+    fields.push(Field::field(
+        "Algorithm",
+        algo_info.display(),
+        (algo_start, algo_end),
+    ));
+
+    // V6 has a 4-byte key material length field
+    let len_start = offset + stream.pos();
+    let key_material_len = stream.uint32()?;
+    let len_end = offset + stream.pos();
+    fields.push(Field::field(
+        "Key Material Length",
+        format!("{} bytes", key_material_len),
+        (len_start, len_end),
+    ));
+
+    let key_material = match algorithm {
+        1..=3 => parse_rsa_key(stream, fields, offset)?,
+        16 => parse_elgamal_key(stream, fields, offset)?,
+        17 => parse_dsa_key(stream, fields, offset)?,
+        18 => parse_ecdh_key(stream, fields, offset)?,
+        19 => parse_ecdsa_key(stream, fields, offset)?,
+        22 => parse_eddsa_key(stream, fields, offset)?,
+        25 => parse_x25519_key(stream, fields, offset)?,
+        26 => parse_x448_key(stream, fields, offset)?,
+        27 => parse_ed25519_key(stream, fields, offset)?,
+        28 => parse_ed448_key(stream, fields, offset)?,
         _ => {
             let data = stream.rest();
             KeyMaterial::Unknown { data }
@@ -394,4 +484,38 @@ fn parse_ed25519_key(
     ));
 
     Ok(KeyMaterial::Ed25519 { public_key })
+}
+
+fn parse_x448_key(
+    stream: &mut ByteStream,
+    fields: &mut Vec<Field>,
+    offset: usize,
+) -> Result<KeyMaterial> {
+    let pk_start = offset + stream.pos();
+    let public_key = stream.hex(56)?;
+    let pk_end = offset + stream.pos();
+    fields.push(Field::field(
+        "Public Key",
+        "448 bits (X448)",
+        (pk_start, pk_end),
+    ));
+
+    Ok(KeyMaterial::X448 { public_key })
+}
+
+fn parse_ed448_key(
+    stream: &mut ByteStream,
+    fields: &mut Vec<Field>,
+    offset: usize,
+) -> Result<KeyMaterial> {
+    let pk_start = offset + stream.pos();
+    let public_key = stream.hex(57)?;
+    let pk_end = offset + stream.pos();
+    fields.push(Field::field(
+        "Public Key",
+        "456 bits (Ed448)",
+        (pk_start, pk_end),
+    ));
+
+    Ok(KeyMaterial::Ed448 { public_key })
 }

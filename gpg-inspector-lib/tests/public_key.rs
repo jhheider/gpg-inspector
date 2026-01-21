@@ -262,3 +262,179 @@ fn test_secret_subkey_tag() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap()[0].tag, PacketTag::SecretSubkey);
 }
+
+// ============================================================================
+// V6 Public Keys (RFC 9580)
+// ============================================================================
+
+/// Build a V6 public key packet with the given algorithm and key material
+fn build_v6_public_key_packet(algorithm: u8, key_material: &[u8]) -> Vec<u8> {
+    let mut packet = Vec::new();
+    packet.push(0xC0 | 6); // Tag 6 = Public Key
+
+    // Body: version (1) + creation_time (4) + algorithm (1) + key_material_len (4) + key_material
+    let body_len = 1 + 4 + 1 + 4 + key_material.len();
+
+    if body_len < 192 {
+        packet.push(body_len as u8);
+    } else {
+        packet.push(0xFF);
+        packet.extend_from_slice(&(body_len as u32).to_be_bytes());
+    }
+
+    packet.push(6); // Version 6
+    packet.extend_from_slice(&[0x60, 0x00, 0x00, 0x00]); // Creation time
+    packet.push(algorithm);
+    packet.extend_from_slice(&(key_material.len() as u32).to_be_bytes()); // Key material length
+    packet.extend_from_slice(key_material);
+
+    packet
+}
+
+#[test]
+fn test_v6_public_key_rsa() {
+    // RSA: n (MPI) + e (MPI)
+    let mut key_material = Vec::new();
+    key_material.extend(build_mpi(16, &[0xAB, 0xCD])); // n: 16 bits
+    key_material.extend(build_mpi(8, &[0x11])); // e: 8 bits
+
+    let packet = build_v6_public_key_packet(1, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 RSA parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_ed25519() {
+    // Ed25519: 32 raw bytes
+    let key_material = vec![0u8; 32];
+
+    let packet = build_v6_public_key_packet(27, &key_material);
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 Ed25519 parse failed: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_v6_public_key_x25519() {
+    // X25519: 32 raw bytes
+    let key_material = vec![0u8; 32];
+
+    let packet = build_v6_public_key_packet(25, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 X25519 parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_ed448() {
+    // Ed448: 57 raw bytes
+    let key_material = vec![0u8; 57];
+
+    let packet = build_v6_public_key_packet(28, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 Ed448 parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_x448() {
+    // X448: 56 raw bytes
+    let key_material = vec![0u8; 56];
+
+    let packet = build_v6_public_key_packet(26, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 X448 parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_unknown_algorithm() {
+    let key_material = vec![0x01, 0x02, 0x03, 0x04];
+
+    let packet = build_v6_public_key_packet(99, &key_material);
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 unknown algo parse failed: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_v6_public_key_ecdsa() {
+    // V6 ECDSA key to exercise V6 dispatcher with legacy algorithm
+    let mut key_material = Vec::new();
+    let oid = [0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07]; // P-256
+    key_material.push(oid.len() as u8);
+    key_material.extend_from_slice(&oid);
+    key_material.extend(build_mpi(256, &[0u8; 32]));
+
+    let packet = build_v6_public_key_packet(19, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 ECDSA parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_ecdh() {
+    // V6 ECDH key
+    let mut key_material = Vec::new();
+    let oid = [0x2B, 0x06, 0x01, 0x04, 0x01, 0x97, 0x55, 0x01, 0x05, 0x01]; // Curve25519
+    key_material.push(oid.len() as u8);
+    key_material.extend_from_slice(&oid);
+    key_material.extend(build_mpi(256, &[0u8; 32]));
+    key_material.push(3); // KDF params length
+    key_material.extend_from_slice(&[0x01, 0x08, 0x07]);
+
+    let packet = build_v6_public_key_packet(18, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 ECDH parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_eddsa_legacy() {
+    // V6 with legacy EdDSA (algo 22)
+    let mut key_material = Vec::new();
+    let oid = [0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01]; // Ed25519
+    key_material.push(oid.len() as u8);
+    key_material.extend_from_slice(&oid);
+    key_material.extend(build_mpi(256, &[0u8; 32]));
+
+    let packet = build_v6_public_key_packet(22, &key_material);
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 EdDSA legacy parse failed: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_v6_public_key_dsa() {
+    // V6 DSA key
+    let mut key_material = Vec::new();
+    key_material.extend(build_mpi(16, &[0x00, 0x01])); // p
+    key_material.extend(build_mpi(8, &[0x02])); // q
+    key_material.extend(build_mpi(8, &[0x03])); // g
+    key_material.extend(build_mpi(8, &[0x04])); // y
+
+    let packet = build_v6_public_key_packet(17, &key_material);
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 DSA parse failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_public_key_elgamal() {
+    // V6 Elgamal key
+    let mut key_material = Vec::new();
+    key_material.extend(build_mpi(16, &[0x00, 0x01])); // p
+    key_material.extend(build_mpi(8, &[0x02])); // g
+    key_material.extend(build_mpi(8, &[0x03])); // y
+
+    let packet = build_v6_public_key_packet(16, &key_material);
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 Elgamal parse failed: {:?}",
+        result.err()
+    );
+}

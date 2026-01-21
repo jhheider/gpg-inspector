@@ -385,3 +385,36 @@ pub fn lookup_aead_algorithm(id: u8) -> LookupResult<u8> {
         name: name.to_string(),
     }
 }
+
+/// Returns the salt length for V6 signatures based on the hash algorithm.
+///
+/// Per RFC 9580 Section 5.2.3, V6 signatures include a salt whose length
+/// depends on the hash algorithm used:
+/// - SHA-256, SHA3-256: 16 bytes
+/// - SHA-384: 24 bytes
+/// - SHA-512, SHA3-512: 32 bytes
+/// - Other hash algorithms: defaults to 16 bytes
+pub fn get_v6_signature_salt_len(hash_algo: u8) -> usize {
+    match hash_algo {
+        8 | 12 => 16,  // SHA-256, SHA3-256
+        9 => 24,       // SHA-384
+        10 | 14 => 32, // SHA-512, SHA3-512
+        _ => 16,       // Default for unknown/other algorithms
+    }
+}
+
+/// Returns the fixed signature size for algorithms with native signatures.
+///
+/// RFC 9580 algorithms Ed25519 and Ed448 use fixed-size native signatures
+/// instead of MPIs:
+/// - Ed25519 (27): 64 bytes
+/// - Ed448 (28): 114 bytes
+///
+/// Returns `None` for algorithms that use MPI-encoded signatures.
+pub fn get_raw_signature_len(pub_algo: u8) -> Option<usize> {
+    match pub_algo {
+        27 => Some(64),  // Ed25519: 64-byte signature
+        28 => Some(114), // Ed448: 114-byte signature
+        _ => None,       // MPI-encoded signatures
+    }
+}

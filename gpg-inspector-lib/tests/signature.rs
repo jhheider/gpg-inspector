@@ -517,3 +517,134 @@ fn test_subpacket_zero_length() {
     let packet = build_signature_packet(0x00, 1, 8, &subpackets, &[], &build_mpi(8, &[0x01]));
     assert!(parse_bytes(packet).is_ok());
 }
+
+// ============================================================================
+// V6 Signatures (RFC 9580)
+// ============================================================================
+
+/// Build a V6 signature packet with 4-byte subpacket lengths and salt
+fn build_v6_signature_packet(
+    sig_type: u8,
+    pub_algo: u8,
+    hash_algo: u8,
+    salt_len: usize,
+    hashed_subpackets: &[u8],
+    unhashed_subpackets: &[u8],
+    signature_data: &[u8],
+) -> Vec<u8> {
+    let mut packet = Vec::new();
+    packet.push(0xC0 | 2); // Tag 2 = Signature
+
+    let mut body = Vec::new();
+    body.push(6); // Version 6
+    body.push(sig_type);
+    body.push(pub_algo);
+    body.push(hash_algo);
+
+    // V6: Salt (length depends on hash algorithm)
+    body.extend(vec![0u8; salt_len]);
+
+    // V6: 4-byte hashed subpacket length
+    body.extend_from_slice(&(hashed_subpackets.len() as u32).to_be_bytes());
+    body.extend_from_slice(hashed_subpackets);
+
+    // V6: 4-byte unhashed subpacket length
+    body.extend_from_slice(&(unhashed_subpackets.len() as u32).to_be_bytes());
+    body.extend_from_slice(unhashed_subpackets);
+
+    // Hash prefix (2 bytes)
+    body.extend_from_slice(&[0xAB, 0xCD]);
+
+    // Signature data
+    body.extend_from_slice(signature_data);
+
+    // Length
+    if body.len() < 192 {
+        packet.push(body.len() as u8);
+    } else {
+        packet.push(0xFF);
+        packet.extend_from_slice(&(body.len() as u32).to_be_bytes());
+    }
+    packet.extend(body);
+
+    packet
+}
+
+#[test]
+fn test_v6_signature_ed25519_sha256() {
+    // Ed25519 with SHA-256 (16-byte salt)
+    let sig_data = vec![0u8; 64]; // 64-byte Ed25519 signature
+    let packet = build_v6_signature_packet(0x00, 27, 8, 16, &[], &[], &sig_data);
+
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 Ed25519/SHA256 sig failed: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_v6_signature_ed25519_sha512() {
+    // Ed25519 with SHA-512 (32-byte salt)
+    let sig_data = vec![0u8; 64];
+    let packet = build_v6_signature_packet(0x00, 27, 10, 32, &[], &[], &sig_data);
+
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 Ed25519/SHA512 sig failed: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_v6_signature_ed448() {
+    // Ed448 with SHA-512 (32-byte salt, 114-byte signature)
+    let sig_data = vec![0u8; 114]; // 114-byte Ed448 signature
+    let packet = build_v6_signature_packet(0x00, 28, 10, 32, &[], &[], &sig_data);
+
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 Ed448 sig failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_signature_rsa() {
+    // RSA with SHA-256 (16-byte salt)
+    let sig_data = build_mpi(16, &[0xAB, 0xCD]);
+    let packet = build_v6_signature_packet(0x00, 1, 8, 16, &[], &[], &sig_data);
+
+    let result = parse_bytes(packet);
+    assert!(result.is_ok(), "V6 RSA sig failed: {:?}", result.err());
+}
+
+#[test]
+fn test_v6_signature_with_subpackets() {
+    // V6 signature with hashed and unhashed subpackets
+    let hashed = build_subpacket(2, &[0x60, 0x00, 0x00, 0x00]); // creation time
+    let unhashed = build_subpacket(16, &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]); // issuer
+    let sig_data = vec![0u8; 64]; // Ed25519
+
+    let packet = build_v6_signature_packet(0x00, 27, 8, 16, &hashed, &unhashed, &sig_data);
+
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 sig with subpackets failed: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_v6_signature_sha384_salt() {
+    // SHA-384: 24-byte salt
+    let sig_data = vec![0u8; 64];
+    let packet = build_v6_signature_packet(0x00, 27, 9, 24, &[], &[], &sig_data);
+
+    let result = parse_bytes(packet);
+    assert!(
+        result.is_ok(),
+        "V6 sig SHA384 salt failed: {:?}",
+        result.err()
+    );
+}
