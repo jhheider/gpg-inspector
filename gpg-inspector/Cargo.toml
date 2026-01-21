@@ -14,7 +14,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
 
 [dependencies]
 gpg-inspector-lib = { path = "../gpg-inspector-lib" }
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = { version = "0.28", features = ["use-dev-tty"] }
 anyhow = "1.0.100"
 clap = { version = "4.5.54", features = ["derive"] }
