@@ -2,16 +2,30 @@
 //!
 //! Tests for packet parsing using constructed byte sequences.
 
+#[path = "packets/compressed_data.rs"]
+mod compressed_data;
 #[path = "packets/format.rs"]
 mod format;
+#[path = "packets/literal_data.rs"]
+mod literal_data;
+#[path = "packets/mdc.rs"]
+mod mdc;
+#[path = "packets/misc.rs"]
+mod misc;
+#[path = "packets/one_pass_signature.rs"]
+mod one_pass_signature;
 #[path = "packets/pkesk.rs"]
 mod pkesk;
 #[path = "packets/secret_key.rs"]
 mod secret_key;
 #[path = "packets/seipd.rs"]
 mod seipd;
+#[path = "packets/skesk.rs"]
+mod skesk;
 #[path = "packets/tags.rs"]
 mod tags;
+#[path = "packets/user_attribute.rs"]
+mod user_attribute;
 
 use gpg_inspector_lib::Field;
 

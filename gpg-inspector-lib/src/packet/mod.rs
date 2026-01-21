@@ -13,6 +13,16 @@
 //! This module parses both old-format and new-format packet headers
 //! as defined in RFC 4880 and RFC 9580.
 
+/// Compressed Data packet parsing.
+pub mod compressed_data;
+/// Literal Data packet parsing.
+pub mod literal_data;
+/// Modification Detection Code packet parsing.
+pub mod mdc;
+/// Miscellaneous simple packet types (Marker, SED, AEAD, Padding).
+pub mod misc;
+/// One-Pass Signature packet parsing.
+pub mod one_pass_signature;
 /// Public-Key Encrypted Session Key packet parsing.
 pub mod pkesk;
 /// Public key and subkey packet parsing.
@@ -23,10 +33,14 @@ pub mod secret_key;
 pub mod seipd;
 /// Signature packet parsing.
 pub mod signature;
+/// Symmetric-Key Encrypted Session Key packet parsing.
+pub mod skesk;
 /// Signature subpacket parsing.
 pub mod subpackets;
 /// Packet tag definitions.
 pub mod tags;
+/// User Attribute packet parsing.
+pub mod user_attribute;
 /// User ID packet parsing.
 pub mod user_id;
 
@@ -135,22 +149,42 @@ pub struct Packet {
 /// Unknown or unsupported packet types are stored as raw bytes.
 #[derive(Debug, Clone)]
 pub enum PacketBody {
-    /// Public key packet (tag 6).
-    PublicKey(public_key::PublicKeyPacket),
-    /// Public subkey packet (tag 14).
-    PublicSubkey(public_key::PublicKeyPacket),
-    /// Secret key packet (tag 5).
-    SecretKey(secret_key::SecretKeyPacket),
-    /// Secret subkey packet (tag 7).
-    SecretSubkey(secret_key::SecretKeyPacket),
-    /// User ID packet (tag 13).
-    UserId(user_id::UserIdPacket),
-    /// Signature packet (tag 2).
-    Signature(signature::SignaturePacket),
     /// Public-Key Encrypted Session Key packet (tag 1).
     Pkesk(pkesk::PkeskPacket),
+    /// Signature packet (tag 2).
+    Signature(signature::SignaturePacket),
+    /// Symmetric-Key Encrypted Session Key packet (tag 3).
+    Skesk(skesk::SkeskPacket),
+    /// One-Pass Signature packet (tag 4).
+    OnePassSignature(one_pass_signature::OnePassSignaturePacket),
+    /// Secret key packet (tag 5).
+    SecretKey(secret_key::SecretKeyPacket),
+    /// Public key packet (tag 6).
+    PublicKey(public_key::PublicKeyPacket),
+    /// Secret subkey packet (tag 7).
+    SecretSubkey(secret_key::SecretKeyPacket),
+    /// Compressed Data packet (tag 8).
+    CompressedData(compressed_data::CompressedDataPacket),
+    /// Symmetrically Encrypted Data packet (tag 9, legacy).
+    SymmetricallyEncryptedData(misc::SymmetricallyEncryptedDataPacket),
+    /// Marker packet (tag 10, obsolete).
+    Marker(misc::MarkerPacket),
+    /// Literal Data packet (tag 11).
+    LiteralData(literal_data::LiteralDataPacket),
+    /// User ID packet (tag 13).
+    UserId(user_id::UserIdPacket),
+    /// Public subkey packet (tag 14).
+    PublicSubkey(public_key::PublicKeyPacket),
+    /// User Attribute packet (tag 17).
+    UserAttribute(user_attribute::UserAttributePacket),
     /// Symmetrically Encrypted Integrity Protected Data packet (tag 18).
     Seipd(seipd::SeipdPacket),
+    /// Modification Detection Code packet (tag 19).
+    Mdc(mdc::MdcPacket),
+    /// AEAD Encrypted Data packet (tag 20, RFC 9580).
+    AeadEncryptedData(misc::AeadEncryptedDataPacket),
+    /// Padding packet (tag 21, RFC 9580).
+    Padding(misc::PaddingPacket),
     /// Unknown or unsupported packet type.
     Unknown(Vec<u8>),
 }
@@ -253,38 +287,81 @@ fn parse_packet_body(
     body_offset: usize,
 ) -> Result<PacketBody> {
     match tag {
-        PacketTag::PublicKey => {
-            let pk = public_key::parse_public_key(stream, fields, body_offset)?;
-            Ok(PacketBody::PublicKey(pk))
-        }
-        PacketTag::PublicSubkey => {
-            let pk = public_key::parse_public_key(stream, fields, body_offset)?;
-            Ok(PacketBody::PublicSubkey(pk))
-        }
-        PacketTag::SecretKey => {
-            let sk = secret_key::parse_secret_key(stream, fields, body_offset)?;
-            Ok(PacketBody::SecretKey(sk))
-        }
-        PacketTag::SecretSubkey => {
-            let sk = secret_key::parse_secret_key(stream, fields, body_offset)?;
-            Ok(PacketBody::SecretSubkey(sk))
-        }
-        PacketTag::UserId => {
-            let uid = user_id::parse_user_id(stream, fields, body_offset)?;
-            Ok(PacketBody::UserId(uid))
+        PacketTag::PublicKeyEncryptedSessionKey => {
+            let pkesk = pkesk::parse_pkesk(stream, fields, body_offset)?;
+            Ok(PacketBody::Pkesk(pkesk))
         }
         PacketTag::Signature => {
             let sig = signature::parse_signature(stream, fields, body_offset)?;
             Ok(PacketBody::Signature(sig))
         }
-        PacketTag::PublicKeyEncryptedSessionKey => {
-            let pkesk = pkesk::parse_pkesk(stream, fields, body_offset)?;
-            Ok(PacketBody::Pkesk(pkesk))
+        PacketTag::SymmetricKeyEncryptedSessionKey => {
+            let skesk = skesk::parse_skesk(stream, fields, body_offset)?;
+            Ok(PacketBody::Skesk(skesk))
+        }
+        PacketTag::OnePassSignature => {
+            let ops = one_pass_signature::parse_one_pass_signature(stream, fields, body_offset)?;
+            Ok(PacketBody::OnePassSignature(ops))
+        }
+        PacketTag::SecretKey => {
+            let sk = secret_key::parse_secret_key(stream, fields, body_offset)?;
+            Ok(PacketBody::SecretKey(sk))
+        }
+        PacketTag::PublicKey => {
+            let pk = public_key::parse_public_key(stream, fields, body_offset)?;
+            Ok(PacketBody::PublicKey(pk))
+        }
+        PacketTag::SecretSubkey => {
+            let sk = secret_key::parse_secret_key(stream, fields, body_offset)?;
+            Ok(PacketBody::SecretSubkey(sk))
+        }
+        PacketTag::CompressedData => {
+            let cd = compressed_data::parse_compressed_data(stream, fields, body_offset)?;
+            Ok(PacketBody::CompressedData(cd))
+        }
+        PacketTag::SymmetricallyEncryptedData => {
+            let sed = misc::parse_symmetrically_encrypted_data(stream, fields, body_offset)?;
+            Ok(PacketBody::SymmetricallyEncryptedData(sed))
+        }
+        PacketTag::Marker => {
+            let marker = misc::parse_marker(stream, fields, body_offset)?;
+            Ok(PacketBody::Marker(marker))
+        }
+        PacketTag::LiteralData => {
+            let ld = literal_data::parse_literal_data(stream, fields, body_offset)?;
+            Ok(PacketBody::LiteralData(ld))
+        }
+        PacketTag::UserId => {
+            let uid = user_id::parse_user_id(stream, fields, body_offset)?;
+            Ok(PacketBody::UserId(uid))
+        }
+        PacketTag::PublicSubkey => {
+            let pk = public_key::parse_public_key(stream, fields, body_offset)?;
+            Ok(PacketBody::PublicSubkey(pk))
+        }
+        PacketTag::UserAttribute => {
+            let ua = user_attribute::parse_user_attribute(stream, fields, body_offset)?;
+            Ok(PacketBody::UserAttribute(ua))
         }
         PacketTag::SymmetricallyEncryptedIntegrityProtectedData => {
             let seipd = seipd::parse_seipd(stream, fields, body_offset)?;
             Ok(PacketBody::Seipd(seipd))
         }
+        PacketTag::ModificationDetectionCode => {
+            let mdc = mdc::parse_mdc(stream, fields, body_offset)?;
+            Ok(PacketBody::Mdc(mdc))
+        }
+        PacketTag::AeadEncryptedData => {
+            let aead = misc::parse_aead_encrypted_data(stream, fields, body_offset)?;
+            Ok(PacketBody::AeadEncryptedData(aead))
+        }
+        PacketTag::Padding => {
+            let padding = misc::parse_padding(stream, fields, body_offset)?;
+            Ok(PacketBody::Padding(padding))
+        }
+        // Trust (tag 12) is implementation-specific and not exported
+        // Reserved (tag 0) should never appear
+        // Unknown tags are stored as raw bytes
         _ => {
             let data = stream.rest();
             if !data.is_empty() {
