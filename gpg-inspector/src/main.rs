@@ -1,8 +1,9 @@
 use std::io::{IsTerminal, Read};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use crossterm::{
     event::{DisableBracketedPaste, EnableBracketedPaste, poll, read},
@@ -12,6 +13,7 @@ use crossterm::{
 use ratatui::{Terminal, backend::CrosstermBackend, layout::Rect};
 
 use gpg_inspector::app::App;
+use gpg_inspector::output;
 use gpg_inspector::{event, ui};
 
 /// Interactive GPG/OpenPGP packet inspector
@@ -26,6 +28,15 @@ struct Cli {
     /// Load GPG data from a file
     #[arg(short, long, value_name = "FILE")]
     file: Option<PathBuf>,
+
+    /// Output as JSON (requires --features serde)
+    #[cfg(feature = "serde")]
+    #[arg(long, conflicts_with = "txt")]
+    json: bool,
+
+    /// Output as formatted text with hex dump
+    #[arg(long)]
+    txt: bool,
 }
 
 /// Requires TTY for terminal setup/teardown
@@ -35,6 +46,28 @@ fn main() -> Result<()> {
 
     // Load initial input from file or stdin
     let initial_input = load_initial_input(&cli)?;
+
+    // Non-interactive output modes
+    #[cfg(feature = "serde")]
+    let wants_output = cli.json || cli.txt;
+    #[cfg(not(feature = "serde"))]
+    let wants_output = cli.txt;
+
+    if wants_output {
+        let input = initial_input.ok_or_else(|| anyhow!("No input provided"))?;
+        let armor = gpg_inspector_lib::decode_armor(&input)?;
+        let packets = gpg_inspector_lib::parse_bytes(Arc::clone(&armor.bytes))?;
+
+        #[cfg(feature = "serde")]
+        if cli.json {
+            println!("{}", output::output_json(&packets, &armor.bytes));
+            return Ok(());
+        }
+
+        let use_color = std::io::stdout().is_terminal();
+        println!("{}", output::output_txt(&packets, &armor.bytes, use_color));
+        return Ok(());
+    }
 
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();

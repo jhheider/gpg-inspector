@@ -1,4 +1,7 @@
+tarpaulin := "cargo tarpaulin --config tarpaulin.toml --all-features"
+
 # Show all tasks
+[private]
 default:
   just -l
 
@@ -24,18 +27,19 @@ coverage:
     just docker-coverage
   else
     mkdir -p coverage
-    cargo tarpaulin --config tarpaulin.toml
+    {{tarpaulin}}
   fi
 
 # Run coverage in docker (for macOS ptrace issues)
 docker-coverage:
   docker run \
     --rm \
+    --pull always \
     --volume .:/volume \
     --workdir /volume \
     --security-opt seccomp=unconfined \
     xd009642/tarpaulin \
-    cargo tarpaulin --config tarpaulin.toml
+    {{tarpaulin}}
 
 # Build release
 build:
