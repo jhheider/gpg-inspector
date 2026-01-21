@@ -4,6 +4,12 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "A library for parsing and inspecting OpenPGP (GPG) packets according to RFC 4880 and RFC 9580"
+readme = "../README.md"
+documentation = "https://docs.rs/gpg-inspector-lib"
 
 [dependencies]
 thiserror = "2.0"

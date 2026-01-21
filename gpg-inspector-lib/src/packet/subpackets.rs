@@ -1,3 +1,9 @@
+//! Signature subpacket parsing.
+//!
+//! This module parses the subpackets embedded in Signature packets.
+//! Subpackets carry additional signature metadata like creation time,
+//! key expiration, preferred algorithms, and issuer identification.
+
 use crate::color::ColorTracker;
 use crate::error::{Error, Result};
 use crate::lookup::{
@@ -16,66 +22,125 @@ fn format_timestamp(ts: u32) -> Result<String> {
         .ok_or(Error::InvalidTimestamp(ts))
 }
 
+/// A parsed signature subpacket.
 #[derive(Debug, Clone)]
 pub struct Subpacket {
+    /// Subpacket type identifier.
     pub packet_type: u8,
+    /// Whether this subpacket is critical (must be understood).
     pub critical: bool,
+    /// The parsed subpacket data.
     pub data: SubpacketData,
 }
 
+/// The typed content of a signature subpacket.
+///
+/// Each variant corresponds to a specific subpacket type defined in
+/// RFC 4880 and RFC 9580.
 #[derive(Debug, Clone)]
 pub enum SubpacketData {
+    /// Signature creation time (type 2).
     SignatureCreationTime(u32),
+    /// Signature expiration time as seconds after creation (type 3).
     SignatureExpirationTime(u32),
+    /// Key expiration time as seconds after key creation (type 9).
     KeyExpirationTime(u32),
+    /// Whether the certification is exportable (type 4).
     Exportable(bool),
+    /// Trust signature level and amount (type 5).
     Trust {
+        /// Trust level (0 = ordinary, 1 = introducer, etc.).
         level: u8,
+        /// Trust amount (0-255).
         amount: u8,
     },
+    /// Whether the signature is revocable (type 7).
     Revocable(bool),
+    /// Preferred symmetric algorithms (type 11).
     PreferredSymmetric(Vec<u8>),
+    /// Revocation key designation (type 12).
     RevocationKey {
+        /// Revocation class.
         class: u8,
+        /// Public-key algorithm of the revocation key.
         algo: u8,
+        /// Fingerprint of the revocation key.
         fingerprint: String,
     },
+    /// Issuer key ID (type 16).
     IssuerKeyId(String),
+    /// Notation data (type 20).
     NotationData {
+        /// Notation name.
         name: String,
+        /// Notation value.
         value: String,
     },
+    /// Preferred hash algorithms (type 21).
     PreferredHash(Vec<u8>),
+    /// Preferred compression algorithms (type 22).
     PreferredCompression(Vec<u8>),
+    /// Key server preferences (type 23).
     KeyServerPreferences(Vec<u8>),
+    /// Preferred key server URL (type 24).
     PreferredKeyServer(String),
+    /// Whether this is the primary user ID (type 25).
     PrimaryUserId(bool),
+    /// Policy URI (type 26).
     PolicyUri(String),
+    /// Key usage flags (type 27).
     KeyFlags(Vec<u8>),
+    /// Signer's user ID (type 28).
     SignerUserId(String),
+    /// Reason for revocation (type 29).
     RevocationReason {
+        /// Reason code.
         code: u8,
+        /// Human-readable reason string.
         reason: String,
     },
+    /// Supported features (type 30).
     Features(Vec<u8>),
+    /// Signature target (type 31).
     SignatureTarget {
+        /// Public-key algorithm.
         algo: u8,
+        /// Hash algorithm.
         hash_algo: u8,
+        /// Hash of the target.
         hash: String,
     },
+    /// Embedded signature (type 32).
     EmbeddedSignature(Vec<u8>),
+    /// Issuer fingerprint (type 33).
     IssuerFingerprint {
+        /// Key version.
         version: u8,
+        /// Key fingerprint.
         fingerprint: String,
     },
+    /// Preferred AEAD algorithms (type 34).
     PreferredAead(Vec<u8>),
+    /// Intended recipient fingerprint (type 35).
     IntendedRecipient {
+        /// Key version.
         version: u8,
+        /// Recipient's key fingerprint.
         fingerprint: String,
     },
+    /// Unknown or unsupported subpacket type.
     Unknown(Vec<u8>),
 }
 
+/// Parses subpackets from a stream.
+///
+/// # Arguments
+///
+/// * `stream` - Stream containing the subpacket data
+/// * `colors` - Color tracker for visualization
+/// * `fields` - Output field list
+/// * `prefix` - Label prefix ("Hashed" or "Unhashed")
+/// * `base_offset` - Byte offset for span calculation
 pub fn parse_subpackets(
     stream: &mut ByteStream,
     colors: &mut ColorTracker,

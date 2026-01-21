@@ -1,3 +1,22 @@
+//! ASCII armor encoding and decoding for PGP data.
+//!
+//! This module handles the ASCII-armored format used for PGP data,
+//! which wraps binary data in Base64 encoding with headers, footers,
+//! and a CRC24 checksum.
+//!
+//! # Format
+//!
+//! Armored data looks like:
+//! ```text
+//! -----BEGIN PGP PUBLIC KEY BLOCK-----
+//!
+//! mDMEZ... (Base64 data)
+//! =XXXX (CRC24 checksum)
+//! -----END PGP PUBLIC KEY BLOCK-----
+//! ```
+//!
+//! The armor type (e.g., "PGP PUBLIC KEY BLOCK") identifies the content type.
+
 use std::sync::Arc;
 
 use crate::error::{Error, Result};
@@ -55,11 +74,51 @@ fn crc24(data: &[u8]) -> u32 {
     crc & 0xFFFFFF
 }
 
+/// The result of decoding ASCII-armored PGP data.
+///
+/// Contains the decoded binary data and the armor type identifier.
 pub struct ArmorResult {
+    /// The decoded binary PGP packet data.
     pub bytes: Arc<[u8]>,
+    /// The armor type (e.g., "PGP PUBLIC KEY BLOCK", "PGP MESSAGE").
     pub armor_type: Arc<str>,
 }
 
+/// Decodes ASCII-armored PGP data into binary.
+///
+/// This function parses the armor format, extracts the Base64-encoded body,
+/// decodes it, and validates the CRC24 checksum if present.
+///
+/// # Arguments
+///
+/// * `input` - ASCII-armored PGP data
+///
+/// # Errors
+///
+/// Returns `Error::InvalidArmor` if:
+/// - Missing `-----BEGIN ... -----` header
+/// - Missing `-----END ... -----` footer
+/// - Empty body
+///
+/// Returns `Error::Base64Error` if the Base64 data contains invalid characters.
+///
+/// Returns `Error::ChecksumMismatch` if the CRC24 checksum doesn't match.
+///
+/// # Example
+///
+/// ```ignore
+/// use gpg_inspector_lib::armor::decode_armor;
+///
+/// let armored = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
+///
+/// mDMEZ...
+/// =XXXX
+/// -----END PGP PUBLIC KEY BLOCK-----"#;
+///
+/// let result = decode_armor(armored)?;
+/// println!("Type: {}", result.armor_type);
+/// println!("Size: {} bytes", result.bytes.len());
+/// ```
 pub fn decode_armor(input: &str) -> Result<ArmorResult> {
     let lines: Vec<&str> = input.lines().collect();
 

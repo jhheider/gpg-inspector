@@ -488,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "gpg-inspector"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "gpg-inspector-lib"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chrono",
  "thiserror 2.0.18",

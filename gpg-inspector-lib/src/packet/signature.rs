@@ -1,3 +1,9 @@
+//! Signature packet parsing.
+//!
+//! This module parses Signature packets (tag 2), which contain cryptographic
+//! signatures over data or other packets. Signatures include metadata like
+//! the signing algorithm, hash algorithm, and various subpackets.
+
 use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::lookup::{lookup_hash_algorithm, lookup_public_key_algorithm, lookup_signature_type};
@@ -5,16 +11,27 @@ use crate::packet::Field;
 use crate::packet::subpackets::parse_subpackets;
 use crate::stream::ByteStream;
 
+/// A parsed signature packet.
+///
+/// Contains the signature metadata (version, type, algorithms) and
+/// the cryptographic signature data.
 #[derive(Debug, Clone)]
 pub struct SignaturePacket {
+    /// Signature packet version (3, 4, or 5).
     pub version: u8,
+    /// Signature type (binary, text, certification, etc.).
     pub signature_type: u8,
+    /// Public-key algorithm used for signing.
     pub pub_algorithm: u8,
+    /// Hash algorithm used.
     pub hash_algorithm: u8,
+    /// First two bytes of the hash (for verification).
     pub hash_prefix: [u8; 2],
+    /// The cryptographic signature data.
     pub signature: Vec<u8>,
 }
 
+/// Parses a signature packet body.
 pub fn parse_signature(
     stream: &mut ByteStream,
     colors: &mut ColorTracker,

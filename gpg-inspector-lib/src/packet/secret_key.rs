@@ -1,3 +1,9 @@
+//! Secret key packet parsing.
+//!
+//! This module parses Secret Key (tag 5) and Secret Subkey (tag 7) packets,
+//! which contain the public key data plus encrypted (or unencrypted) private
+//! key material.
+
 use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::lookup::{lookup_s2k_type, lookup_symmetric_algorithm};
@@ -5,24 +11,46 @@ use crate::packet::Field;
 use crate::packet::public_key::{PublicKeyPacket, parse_public_key};
 use crate::stream::ByteStream;
 
+/// A parsed secret key or secret subkey packet.
+///
+/// Contains the public key portion plus the secret key data,
+/// which may be encrypted with a passphrase.
 #[derive(Debug, Clone)]
 pub struct SecretKeyPacket {
+    /// The public key portion (version, creation time, algorithm, key material).
     pub public_key: PublicKeyPacket,
+    /// String-to-Key usage byte indicating encryption method.
     pub s2k_usage: u8,
+    /// Encryption parameters, if the key is encrypted.
     pub encryption_info: Option<EncryptionInfo>,
+    /// The secret key data (encrypted or plaintext).
     pub secret_key_data: Vec<u8>,
 }
 
+/// Encryption parameters for a secret key.
+///
+/// Describes how the secret key material is encrypted, including
+/// the cipher, S2K (string-to-key) parameters, and IV.
 #[derive(Debug, Clone)]
 pub struct EncryptionInfo {
+    /// Symmetric cipher algorithm used for encryption.
     pub cipher_algo: u8,
+    /// S2K specifier type (Simple, Salted, Iterated, Argon2).
     pub s2k_type: u8,
+    /// Hash algorithm used in S2K.
     pub s2k_hash: u8,
+    /// 8-byte salt for Salted and Iterated S2K.
     pub s2k_salt: Option<Vec<u8>>,
+    /// Iteration count byte for Iterated S2K.
     pub s2k_count: Option<u8>,
+    /// Initialization vector for the cipher.
     pub iv: Vec<u8>,
 }
 
+/// Parses a secret key packet body.
+///
+/// This function is called for both Secret Key (tag 5) and Secret Subkey (tag 7)
+/// packets, as they share the same format.
 pub fn parse_secret_key(
     stream: &mut ByteStream,
     colors: &mut ColorTracker,

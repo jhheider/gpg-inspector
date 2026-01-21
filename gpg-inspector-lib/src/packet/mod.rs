@@ -1,10 +1,33 @@
+//! OpenPGP packet parsing and type definitions.
+//!
+//! This module provides the core packet parsing functionality, including
+//! the [`Packet`] container, [`PacketBody`] enum for typed packet data,
+//! and the [`Field`] struct for hierarchical field representation.
+//!
+//! # Packet Structure
+//!
+//! OpenPGP data consists of a sequence of packets, each with:
+//! - A header (tag + length)
+//! - A body containing packet-specific data
+//!
+//! This module parses both old-format and new-format packet headers
+//! as defined in RFC 4880 and RFC 9580.
+
+/// Public-Key Encrypted Session Key packet parsing.
 pub mod pkesk;
+/// Public key and subkey packet parsing.
 pub mod public_key;
+/// Secret key and subkey packet parsing.
 pub mod secret_key;
+/// Symmetrically Encrypted Integrity Protected Data packet parsing.
 pub mod seipd;
+/// Signature packet parsing.
 pub mod signature;
+/// Signature subpacket parsing.
 pub mod subpackets;
+/// Packet tag definitions.
 pub mod tags;
+/// User ID packet parsing.
 pub mod user_id;
 
 use std::sync::Arc;
@@ -14,17 +37,34 @@ use crate::error::{Error, Result};
 use crate::stream::ByteStream;
 use tags::PacketTag;
 
-/// A field with its name, value, byte span, color, and indent level for hierarchy display
+/// A field with its name, value, byte span, color, and indent level.
+///
+/// Fields represent individual pieces of parsed data within a packet.
+/// They form a hierarchy with three indent levels:
+/// - Level 0: Packet headers
+/// - Level 1: Top-level fields within a packet
+/// - Level 2: Nested subfields (e.g., signature subpackets)
+///
+/// # Visualization
+///
+/// The `span` and `color` fields support hex dump visualization,
+/// allowing UI code to highlight the corresponding bytes.
 #[derive(Debug, Clone)]
 pub struct Field {
+    /// The field name (e.g., "Version", "Algorithm", "Creation Time").
     pub name: Arc<str>,
+    /// The field value as a human-readable string.
     pub value: Arc<str>,
+    /// Indentation level: 0 = packet, 1 = field, 2 = subfield.
     pub indent: u8,
+    /// Byte range `(start, end)` in the original data.
     pub span: (usize, usize),
-    pub color: Option<u8>, // None = white (header)
+    /// Color index from the palette, or `None` for headers (white).
+    pub color: Option<u8>,
 }
 
 impl Field {
+    /// Creates a new field with all parameters specified.
     pub fn new(
         name: impl Into<Arc<str>>,
         value: impl Into<Arc<str>>,
@@ -41,6 +81,9 @@ impl Field {
         }
     }
 
+    /// Creates a packet-level field (indent 0, no color).
+    ///
+    /// Used for packet type headers like "Packet: Public Key".
     pub fn packet(
         name: impl Into<Arc<str>>,
         value: impl Into<Arc<str>>,
@@ -49,6 +92,9 @@ impl Field {
         Self::new(name, value, 0, span, None)
     }
 
+    /// Creates a regular field (indent 1, with color).
+    ///
+    /// Used for top-level packet fields like "Version", "Algorithm".
     #[allow(clippy::self_named_constructors)]
     pub fn field(
         name: impl Into<Arc<str>>,
@@ -59,6 +105,9 @@ impl Field {
         Self::new(name, value, 1, span, Some(color))
     }
 
+    /// Creates a subfield (indent 2, with color).
+    ///
+    /// Used for nested data like signature subpackets.
     pub fn subfield(
         name: impl Into<Arc<str>>,
         value: impl Into<Arc<str>>,
@@ -69,29 +118,60 @@ impl Field {
     }
 }
 
+/// A parsed OpenPGP packet with metadata and fields.
+///
+/// Contains the raw packet boundaries, parsed body, color tracking
+/// for visualization, and a list of human-readable fields.
 #[derive(Debug, Clone)]
 pub struct Packet {
+    /// Byte offset where this packet starts in the original data.
     pub start: usize,
+    /// Byte offset where this packet ends (exclusive).
     pub end: usize,
+    /// The packet type tag.
     pub tag: PacketTag,
+    /// The parsed packet body.
     pub body: PacketBody,
+    /// Color assignments for visualization.
     pub colors: ColorTracker,
+    /// Parsed fields for display.
     pub fields: Vec<Field>,
 }
 
+/// The typed body of a parsed packet.
+///
+/// Each variant contains the parsed structure for that packet type.
+/// Unknown or unsupported packet types are stored as raw bytes.
 #[derive(Debug, Clone)]
 pub enum PacketBody {
+    /// Public key packet (tag 6).
     PublicKey(public_key::PublicKeyPacket),
+    /// Public subkey packet (tag 14).
     PublicSubkey(public_key::PublicKeyPacket),
+    /// Secret key packet (tag 5).
     SecretKey(secret_key::SecretKeyPacket),
+    /// Secret subkey packet (tag 7).
     SecretSubkey(secret_key::SecretKeyPacket),
+    /// User ID packet (tag 13).
     UserId(user_id::UserIdPacket),
+    /// Signature packet (tag 2).
     Signature(signature::SignaturePacket),
+    /// Public-Key Encrypted Session Key packet (tag 1).
     Pkesk(pkesk::PkeskPacket),
+    /// Symmetrically Encrypted Integrity Protected Data packet (tag 18).
     Seipd(seipd::SeipdPacket),
+    /// Unknown or unsupported packet type.
     Unknown(Vec<u8>),
 }
 
+/// Parses binary PGP data into a vector of packets.
+///
+/// This is the main entry point for parsing raw (non-armored) PGP data.
+/// For armored data, use [`crate::parse`] which handles decoding first.
+///
+/// # Errors
+///
+/// Returns an error if any packet has an invalid structure.
 pub fn parse_packets(bytes: Arc<[u8]>) -> Result<Vec<Packet>> {
     let mut stream = ByteStream::from_arc(bytes);
     let mut packets = Vec::new();

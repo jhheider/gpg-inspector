@@ -1,14 +1,54 @@
+//! Algorithm and format lookup tables for OpenPGP identifiers.
+//!
+//! This module provides functions to convert numeric algorithm IDs and
+//! other OpenPGP identifiers to human-readable names. These lookups are
+//! based on RFC 4880 and RFC 9580.
+//!
+//! # Example
+//!
+//! ```
+//! use gpg_inspector_lib::lookup::lookup_public_key_algorithm;
+//!
+//! let result = lookup_public_key_algorithm(1);
+//! assert_eq!(result.name, "RSA (Encrypt or Sign)");
+//! println!("{}", result.display()); // "1 (RSA (Encrypt or Sign))"
+//! ```
+
+/// The result of a lookup operation, containing both the raw value and its name.
+///
+/// This struct pairs the original identifier with its human-readable name,
+/// allowing display in formats like "1 (RSA)" or just the name.
 pub struct LookupResult<T> {
+    /// The original identifier value.
     pub value: T,
+    /// The human-readable name for this identifier.
     pub name: String,
 }
 
 impl<T: std::fmt::Display> LookupResult<T> {
+    /// Returns a formatted string combining value and name.
+    ///
+    /// Format: `"{value} ({name})"`, e.g., `"1 (RSA (Encrypt or Sign))"`.
     pub fn display(&self) -> String {
         format!("{} ({})", self.value, self.name)
     }
 }
 
+/// Looks up a public-key algorithm by its RFC 4880/9580 identifier.
+///
+/// # Supported Algorithms
+///
+/// - 1: RSA (Encrypt or Sign)
+/// - 2: RSA Encrypt-Only
+/// - 3: RSA Sign-Only
+/// - 16: Elgamal (Encrypt-Only)
+/// - 17: DSA
+/// - 18: ECDH
+/// - 19: ECDSA
+/// - 22: EdDSA (legacy)
+/// - 25: X25519
+/// - 27: Ed25519
+/// - 100-110: Private/Experimental
 pub fn lookup_public_key_algorithm(id: u8) -> LookupResult<u8> {
     let name = match id {
         1 => "RSA (Encrypt or Sign)",
@@ -36,6 +76,18 @@ pub fn lookup_public_key_algorithm(id: u8) -> LookupResult<u8> {
     }
 }
 
+/// Looks up a symmetric-key algorithm by its RFC 4880/9580 identifier.
+///
+/// # Supported Algorithms
+///
+/// - 0: Plaintext (unencrypted)
+/// - 1: IDEA
+/// - 2: TripleDES
+/// - 3: CAST5
+/// - 4: Blowfish
+/// - 7-9: AES (128/192/256)
+/// - 10: Twofish
+/// - 11-13: Camellia (128/192/256)
 pub fn lookup_symmetric_algorithm(id: u8) -> LookupResult<u8> {
     let name = match id {
         0 => "Plaintext",
@@ -61,6 +113,15 @@ pub fn lookup_symmetric_algorithm(id: u8) -> LookupResult<u8> {
     }
 }
 
+/// Looks up a hash algorithm by its RFC 4880/9580 identifier.
+///
+/// # Supported Algorithms
+///
+/// - 1: MD5 (deprecated)
+/// - 2: SHA-1 (deprecated for signatures)
+/// - 3: RIPEMD-160
+/// - 8-11: SHA-2 family (256/384/512/224)
+/// - 12, 14: SHA-3 family (256/512)
 pub fn lookup_hash_algorithm(id: u8) -> LookupResult<u8> {
     let name = match id {
         1 => "MD5",
@@ -86,6 +147,14 @@ pub fn lookup_hash_algorithm(id: u8) -> LookupResult<u8> {
     }
 }
 
+/// Looks up a compression algorithm by its RFC 4880 identifier.
+///
+/// # Supported Algorithms
+///
+/// - 0: Uncompressed
+/// - 1: ZIP (RFC 1951)
+/// - 2: ZLIB (RFC 1950)
+/// - 3: BZip2
 pub fn lookup_compression_algorithm(id: u8) -> LookupResult<u8> {
     let name = match id {
         0 => "Uncompressed",
@@ -101,6 +170,18 @@ pub fn lookup_compression_algorithm(id: u8) -> LookupResult<u8> {
     }
 }
 
+/// Looks up a signature type by its RFC 4880 identifier.
+///
+/// # Signature Types
+///
+/// - 0x00: Binary document signature
+/// - 0x01: Canonical text document signature
+/// - 0x10-0x13: Key certifications (generic to positive)
+/// - 0x18: Subkey binding signature
+/// - 0x19: Primary key binding signature
+/// - 0x1F: Direct key signature
+/// - 0x20, 0x28, 0x30: Revocation signatures
+/// - 0x40: Timestamp signature
 pub fn lookup_signature_type(id: u8) -> LookupResult<u8> {
     let name = match id {
         0x00 => "Binary document",
@@ -126,6 +207,10 @@ pub fn lookup_signature_type(id: u8) -> LookupResult<u8> {
     }
 }
 
+/// Looks up a signature subpacket type by its RFC 4880/9580 identifier.
+///
+/// Subpackets carry additional signature metadata like creation time,
+/// key expiration, preferred algorithms, and issuer identification.
 pub fn lookup_subpacket_type(id: u8) -> LookupResult<u8> {
     let name = match id {
         0 => "Reserved",
@@ -172,6 +257,17 @@ pub fn lookup_subpacket_type(id: u8) -> LookupResult<u8> {
     }
 }
 
+/// Converts an elliptic curve OID to its human-readable name.
+///
+/// # Supported Curves
+///
+/// - NIST P-256, P-384, P-521
+/// - Brainpool P256r1, P384r1, P512r1
+/// - Curve25519, Ed25519
+///
+/// # Returns
+///
+/// Returns the curve name if recognized, or `"Unknown OID (hex)"` otherwise.
 pub fn lookup_curve_oid(oid: &[u8]) -> String {
     match oid {
         [0x2B, 0x81, 0x04, 0x00, 0x22] => "secp384r1 (NIST P-384)".to_string(),
@@ -189,6 +285,17 @@ pub fn lookup_curve_oid(oid: &[u8]) -> String {
     }
 }
 
+/// Decodes key usage flags into a list of capability names.
+///
+/// # Flag Bits
+///
+/// - 0x01: Certify (sign other keys)
+/// - 0x02: Sign (create signatures)
+/// - 0x04: Encrypt communications
+/// - 0x08: Encrypt storage
+/// - 0x10: Split key (part of a shared key)
+/// - 0x20: Authentication
+/// - 0x80: Shared key (held by multiple parties)
 pub fn lookup_key_flags(flags: u8) -> Vec<&'static str> {
     let mut result = Vec::new();
     if flags & 0x01 != 0 {
@@ -215,6 +322,15 @@ pub fn lookup_key_flags(flags: u8) -> Vec<&'static str> {
     result
 }
 
+/// Looks up a revocation reason code.
+///
+/// # Reason Codes
+///
+/// - 0: No reason specified
+/// - 1: Key is superseded
+/// - 2: Key material has been compromised
+/// - 3: Key is retired and no longer used
+/// - 32: User ID information is no longer valid
 pub fn lookup_revocation_reason(code: u8) -> &'static str {
     match code {
         0 => "No reason specified",
@@ -226,6 +342,16 @@ pub fn lookup_revocation_reason(code: u8) -> &'static str {
     }
 }
 
+/// Looks up a String-to-Key (S2K) specifier type.
+///
+/// S2K specifiers define how a passphrase is converted into a symmetric key.
+///
+/// # Types
+///
+/// - 0: Simple S2K (hash passphrase directly)
+/// - 1: Salted S2K (hash with 8-byte salt)
+/// - 3: Iterated and Salted S2K (repeated hashing)
+/// - 4: Argon2 (memory-hard KDF)
 pub fn lookup_s2k_type(id: u8) -> &'static str {
     match id {
         0 => "Simple S2K",
@@ -238,6 +364,13 @@ pub fn lookup_s2k_type(id: u8) -> &'static str {
     }
 }
 
+/// Looks up an AEAD algorithm by its RFC 9580 identifier.
+///
+/// # Supported Algorithms
+///
+/// - 1: EAX
+/// - 2: OCB
+/// - 3: GCM
 pub fn lookup_aead_algorithm(id: u8) -> LookupResult<u8> {
     let name = match id {
         0 => "Reserved",

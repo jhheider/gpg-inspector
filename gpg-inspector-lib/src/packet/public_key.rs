@@ -1,3 +1,8 @@
+//! Public key packet parsing.
+//!
+//! This module parses Public Key (tag 6) and Public Subkey (tag 14) packets,
+//! extracting the key version, creation time, algorithm, and key material.
+
 use crate::color::ColorTracker;
 use crate::error::{Error, Result};
 use crate::lookup::{lookup_curve_oid, lookup_public_key_algorithm};
@@ -12,55 +17,99 @@ fn format_timestamp(ts: u32) -> Result<String> {
         .ok_or(Error::InvalidTimestamp(ts))
 }
 
+/// A parsed public key or public subkey packet.
+///
+/// Contains the common key metadata (version, creation time, algorithm)
+/// and the algorithm-specific key material.
 #[derive(Debug, Clone)]
 pub struct PublicKeyPacket {
+    /// Key packet version (typically 4 or 5).
     pub version: u8,
+    /// Unix timestamp of key creation.
     pub creation_time: u32,
+    /// Public-key algorithm identifier.
     pub algorithm: u8,
+    /// Algorithm-specific public key data.
     pub key_material: KeyMaterial,
 }
 
+/// Algorithm-specific public key material.
+///
+/// Different key algorithms use different mathematical structures.
+/// Each variant contains the public components needed for that algorithm.
 #[derive(Debug, Clone)]
 pub enum KeyMaterial {
+    /// RSA public key (algorithms 1-3).
     Rsa {
+        /// RSA modulus n (product of two primes).
         n: String,
+        /// RSA public exponent e.
         e: String,
     },
+    /// DSA public key (algorithm 17).
     Dsa {
+        /// Prime modulus.
         p: String,
+        /// Prime divisor of p-1.
         q: String,
+        /// Generator of the subgroup of order q.
         g: String,
+        /// Public key value g^x mod p.
         y: String,
     },
+    /// Elgamal public key (algorithm 16).
     Elgamal {
+        /// Prime modulus.
         p: String,
+        /// Generator.
         g: String,
+        /// Public key value.
         y: String,
     },
+    /// ECDSA public key (algorithm 19).
     Ecdsa {
+        /// OID identifying the elliptic curve.
         curve_oid: Vec<u8>,
+        /// Encoded public point on the curve.
         public_key: String,
     },
+    /// ECDH public key (algorithm 18).
     Ecdh {
+        /// OID identifying the elliptic curve.
         curve_oid: Vec<u8>,
+        /// Encoded public point on the curve.
         public_key: String,
+        /// Key Derivation Function parameters.
         kdf_params: Vec<u8>,
     },
+    /// EdDSA public key (legacy algorithm 22).
     EdDsa {
+        /// OID identifying the curve (typically Ed25519).
         curve_oid: Vec<u8>,
+        /// Encoded public key.
         public_key: String,
     },
+    /// X25519 public key (algorithm 25, RFC 9580).
     X25519 {
+        /// 32-byte public key.
         public_key: String,
     },
+    /// Ed25519 public key (algorithm 27, RFC 9580).
     Ed25519 {
+        /// 32-byte public key.
         public_key: String,
     },
+    /// Unknown or unsupported algorithm.
     Unknown {
+        /// Raw key material bytes.
         data: Vec<u8>,
     },
 }
 
+/// Parses a public key packet body.
+///
+/// This function is called for both Public Key (tag 6) and Public Subkey (tag 14)
+/// packets, as they share the same format.
 pub fn parse_public_key(
     stream: &mut ByteStream,
     colors: &mut ColorTracker,

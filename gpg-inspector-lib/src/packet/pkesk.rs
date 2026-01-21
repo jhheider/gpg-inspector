@@ -1,17 +1,32 @@
+//! Public-Key Encrypted Session Key packet parsing.
+//!
+//! This module parses PKESK packets (tag 1), which contain a session key
+//! encrypted to a recipient's public key. These packets are used at the
+//! start of encrypted messages to deliver the symmetric session key.
+
 use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::lookup::lookup_public_key_algorithm;
 use crate::packet::Field;
 use crate::stream::ByteStream;
 
+/// A parsed Public-Key Encrypted Session Key packet.
+///
+/// Contains the recipient's key ID, the encryption algorithm, and
+/// the encrypted session key data.
 #[derive(Debug, Clone)]
 pub struct PkeskPacket {
+    /// Packet version (typically 3).
     pub version: u8,
+    /// Key ID of the recipient's public key (8 hex characters).
     pub key_id: String,
+    /// Public-key algorithm used to encrypt the session key.
     pub algorithm: u8,
+    /// The encrypted session key data.
     pub encrypted_session_key: Vec<u8>,
 }
 
+/// Parses a PKESK packet body.
 pub fn parse_pkesk(
     stream: &mut ByteStream,
     colors: &mut ColorTracker,

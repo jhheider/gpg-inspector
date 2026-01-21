@@ -1,18 +1,33 @@
+//! Symmetrically Encrypted Integrity Protected Data packet parsing.
+//!
+//! This module parses SEIPD packets (tag 18), which contain encrypted
+//! message data with integrity protection. Version 1 uses MDC (Modification
+//! Detection Code), while version 2 uses AEAD encryption.
+
 use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::lookup::{lookup_aead_algorithm, lookup_symmetric_algorithm};
 use crate::packet::Field;
 use crate::stream::ByteStream;
 
+/// A parsed SEIPD (Symmetrically Encrypted Integrity Protected Data) packet.
+///
+/// Contains encrypted data and, for version 2, AEAD parameters.
 #[derive(Debug, Clone)]
 pub struct SeipdPacket {
+    /// Packet version (1 = MDC, 2 = AEAD).
     pub version: u8,
+    /// Symmetric cipher algorithm (version 2 only).
     pub cipher_algo: Option<u8>,
+    /// AEAD algorithm (version 2 only).
     pub aead_algo: Option<u8>,
+    /// Chunk size exponent (version 2 only).
     pub chunk_size: Option<u8>,
+    /// The encrypted data.
     pub encrypted_data: Vec<u8>,
 }
 
+/// Parses a SEIPD packet body.
 pub fn parse_seipd(
     stream: &mut ByteStream,
     colors: &mut ColorTracker,
