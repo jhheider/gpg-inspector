@@ -13,7 +13,7 @@ mod seipd;
 #[path = "packets/tags.rs"]
 mod tags;
 
-use gpg_inspector_lib::{ColorTracker, Field};
+use gpg_inspector_lib::Field;
 
 // ============================================================================
 // Field Tests
@@ -23,39 +23,20 @@ use gpg_inspector_lib::{ColorTracker, Field};
 fn test_field_constructors() {
     let packet = Field::packet("Test", "Value", (0, 10));
     assert_eq!(packet.indent, 0);
-    assert!(packet.color.is_none());
 
-    let field = Field::field("Test", "Value", (0, 10), 5);
+    let field = Field::field("Test", "Value", (0, 10));
     assert_eq!(field.indent, 1);
-    assert_eq!(field.color, Some(5));
 
-    let subfield = Field::subfield("Test", "Value", (0, 10), 3);
+    let subfield = Field::subfield("Test", "Value", (0, 10));
     assert_eq!(subfield.indent, 2);
-    assert_eq!(subfield.color, Some(3));
-}
-
-// ============================================================================
-// ColorTracker Edge Cases
-// ============================================================================
-
-#[test]
-fn test_color_tracker_out_of_bounds() {
-    let tracker = ColorTracker::new(10);
-    assert_eq!(tracker.get_color(100), None);
 }
 
 #[test]
-fn test_color_tracker_set_field_invalid_range() {
-    let mut tracker = ColorTracker::new(10);
-    let color = tracker.set_field(5, 100);
-    assert_eq!(color, 0);
-    assert_eq!(tracker.get_color(5), None);
-}
+fn test_field_spans() {
+    let field = Field::field("Test", "Value", (5, 15));
+    assert_eq!(field.span, (5, 15));
 
-#[test]
-fn test_color_tracker_empty_range() {
-    let mut tracker = ColorTracker::new(10);
-    let color = tracker.set_field(5, 5);
-    assert_eq!(color, 0);
-    assert_eq!(tracker.get_color(5), None);
+    let field = Field::new("Custom", "Value", 3, (100, 200));
+    assert_eq!(field.indent, 3);
+    assert_eq!(field.span, (100, 200));
 }

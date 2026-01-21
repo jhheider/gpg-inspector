@@ -20,7 +20,6 @@
 //! # Modules
 //!
 //! - [`armor`] - ASCII armor decoding (Base64 + CRC24 checksum)
-//! - [`color`] - Color tracking for visualization
 //! - [`error`] - Error types for parsing failures
 //! - [`lookup`] - Algorithm and format lookup tables
 //! - [`packet`] - Packet parsing and type definitions
@@ -29,7 +28,6 @@
 #![warn(missing_docs)]
 
 pub mod armor;
-pub mod color;
 pub mod error;
 pub mod lookup;
 pub mod packet;
@@ -38,7 +36,6 @@ pub mod stream;
 use std::sync::Arc;
 
 pub use armor::{ArmorResult, decode_armor};
-pub use color::{ColorTracker, PALETTE};
 pub use error::{Error, Result};
 pub use packet::{Field, Packet, PacketBody};
 pub use stream::ByteStream;

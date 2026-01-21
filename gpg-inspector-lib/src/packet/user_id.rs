@@ -4,7 +4,6 @@
 //! string identifying the key owner. The typical format is
 //! "Name (Comment) <email@example.com>".
 
-use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::packet::Field;
 use crate::stream::ByteStream;
@@ -21,7 +20,6 @@ pub struct UserIdPacket {
 /// Parses a User ID packet body.
 pub fn parse_user_id(
     stream: &mut ByteStream,
-    colors: &mut ColorTracker,
     fields: &mut Vec<Field>,
     offset: usize,
 ) -> Result<UserIdPacket> {
@@ -29,13 +27,7 @@ pub fn parse_user_id(
     let user_id = stream.utf8(stream.remaining())?;
     let end = offset + stream.pos();
 
-    let color = colors.set_field(start, end);
-    fields.push(Field::field(
-        "User ID",
-        user_id.clone(),
-        (start, end),
-        color,
-    ));
+    fields.push(Field::field("User ID", user_id.clone(), (start, end)));
 
     Ok(UserIdPacket { user_id })
 }

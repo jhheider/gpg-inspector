@@ -4,7 +4,7 @@
 
 mod packets;
 
-use gpg_inspector_lib::{ByteStream, ColorTracker, PALETTE, decode_armor, parse, parse_bytes};
+use gpg_inspector_lib::{ByteStream, decode_armor, parse, parse_bytes};
 
 const TEST_PUBLIC_KEY: &str = include_str!("../../fixtures/test.key");
 
@@ -112,55 +112,6 @@ fn test_packet_byte_ranges() {
             assert!(end >= start, "Invalid field span");
         }
     }
-}
-
-// ============================================================================
-// ColorTracker Tests
-// ============================================================================
-
-#[test]
-fn test_color_tracker_rotation() {
-    let mut tracker = ColorTracker::new(100);
-
-    // Set 10 fields, colors should rotate through 8 palette entries
-    let colors: Vec<u8> = (0..10)
-        .map(|i| tracker.set_field(i * 10, (i + 1) * 10))
-        .collect();
-
-    assert_eq!(colors[0], 0);
-    assert_eq!(colors[7], 7);
-    assert_eq!(colors[8], 0); // Wraps around
-    assert_eq!(colors[9], 1);
-}
-
-#[test]
-fn test_color_tracker_get_color() {
-    let mut tracker = ColorTracker::new(50);
-
-    tracker.set_field(0, 10); // Color 0
-    tracker.set_field(10, 20); // Color 1
-
-    assert_eq!(tracker.get_color(5), Some(0));
-    assert_eq!(tracker.get_color(15), Some(1));
-    assert_eq!(tracker.get_color(25), None); // No color set
-}
-
-#[test]
-fn test_color_tracker_header_no_color() {
-    let mut tracker = ColorTracker::new(50);
-
-    tracker.set_header(0, 10);
-    let field_color = tracker.set_field(10, 20);
-
-    // Header bytes should have no color
-    assert_eq!(tracker.get_color(5), None);
-    // Field bytes should have color
-    assert_eq!(tracker.get_color(15), Some(field_color));
-}
-
-#[test]
-fn test_palette_size() {
-    assert_eq!(PALETTE.len(), 8, "Palette should have 8 colors");
 }
 
 // ============================================================================

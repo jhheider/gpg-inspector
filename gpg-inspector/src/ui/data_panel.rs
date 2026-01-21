@@ -66,7 +66,7 @@ impl Widget for DataPanel<'_> {
             let indent = field.indent as usize;
 
             // Get the color for this field (None means header/white)
-            let color = match self.app.get_field_color(field) {
+            let color = match self.app.get_field_color(field_idx) {
                 Some(idx) => get_color(idx),
                 None => Color::White, // Headers are white
             };

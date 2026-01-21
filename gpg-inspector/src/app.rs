@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use gpg_inspector_lib::{Field, Packet};
 
+use crate::ui::colors::ColorTracker;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelFocus {
     Input,
@@ -22,6 +24,7 @@ pub struct App {
     pub cursor_pos: usize,
     pub packets: Vec<Packet>,
     pub raw_bytes: Arc<[u8]>,
+    pub color_tracker: ColorTracker,
     pub focus: PanelFocus,
     pub hex_scroll: usize,
     pub data_scroll: usize,
@@ -38,6 +41,7 @@ impl App {
             cursor_pos: 0,
             packets: Vec::new(),
             raw_bytes: Arc::from([]),
+            color_tracker: ColorTracker::default(),
             focus: PanelFocus::Input,
             hex_scroll: 0,
             data_scroll: 0,
@@ -52,6 +56,7 @@ impl App {
         if self.input.trim().is_empty() {
             self.packets.clear();
             self.raw_bytes = Arc::from([]);
+            self.color_tracker = ColorTracker::default();
             self.error_message = None;
             return;
         }
@@ -61,11 +66,15 @@ impl App {
                 self.raw_bytes = Arc::clone(&armor_result.bytes);
                 match gpg_inspector_lib::parse_bytes(armor_result.bytes) {
                     Ok(packets) => {
+                        // Compute colors from field spans
+                        self.color_tracker =
+                            ColorTracker::compute_from_packets(&packets, self.raw_bytes.len());
                         self.packets = packets;
                         self.error_message = None;
                     }
                     Err(e) => {
                         self.packets.clear();
+                        self.color_tracker = ColorTracker::default();
                         self.error_message = Some(format!("Parse error: {}", e));
                     }
                 }
@@ -73,6 +82,7 @@ impl App {
             Err(e) => {
                 self.packets.clear();
                 self.raw_bytes = Arc::from([]);
+                self.color_tracker = ColorTracker::default();
                 self.error_message = Some(format!("Armor error: {}", e));
             }
         }
@@ -92,17 +102,37 @@ impl App {
         field.span
     }
 
-    pub fn get_field_color(&self, field: &Field) -> Option<u8> {
-        field.color
+    /// Returns the color index for a field based on its position.
+    /// Fields with indent == 0 (packet headers) get no color.
+    pub fn get_field_color(&self, field_index: usize) -> Option<u8> {
+        let fields = self.get_all_fields();
+        if field_index >= fields.len() {
+            return None;
+        }
+
+        let field = fields[field_index];
+        if field.indent == 0 {
+            return None;
+        }
+
+        // Count non-header fields before this one
+        let mut color_index: u8 = 0;
+        for (i, f) in fields.iter().enumerate() {
+            if i == field_index {
+                return Some(color_index);
+            }
+            if f.indent > 0 {
+                color_index = (color_index + 1) % 12;
+            }
+        }
+        unreachable!(
+            "field_index {} is within bounds but not found in iteration",
+            field_index
+        )
     }
 
     pub fn get_byte_color(&self, byte_index: usize) -> Option<u8> {
-        for packet in &self.packets {
-            if byte_index >= packet.start && byte_index < packet.end {
-                return packet.colors.get_color(byte_index);
-            }
-        }
-        None
+        self.color_tracker.get_color(byte_index)
     }
 
     pub fn update_highlight(&mut self) {

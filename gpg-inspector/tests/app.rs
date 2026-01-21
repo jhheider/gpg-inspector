@@ -123,13 +123,27 @@ fn test_get_field_color_and_span() {
     assert!(!fields.is_empty());
 
     // Check that we can get color and span for fields
-    for field in &fields {
+    for (field_idx, field) in fields.iter().enumerate() {
         let span = app.get_field_span(field);
         assert!(span.0 <= span.1, "span start should be <= end");
 
-        // Color may be Some or None depending on field type
-        let _color = app.get_field_color(field);
+        // Color may be Some or None depending on field type (headers have no color)
+        let _color = app.get_field_color(field_idx);
     }
+}
+
+#[test]
+fn test_get_field_color_out_of_bounds() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    let fields = app.get_all_fields();
+    assert!(!fields.is_empty());
+
+    // Index beyond field count should return None
+    let color = app.get_field_color(fields.len() + 100);
+    assert_eq!(color, None);
 }
 
 #[test]

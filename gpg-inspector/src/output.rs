@@ -1,4 +1,5 @@
-use gpg_inspector_lib::{PALETTE, Packet};
+use crate::ui::colors::{ColorTracker, PALETTE_RGB};
+use gpg_inspector_lib::Packet;
 
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
@@ -9,12 +10,16 @@ fn rgb_color(r: u8, g: u8, b: u8) -> String {
 }
 
 fn palette_color(index: u8) -> String {
-    let (r, g, b) = PALETTE[index as usize % PALETTE.len()];
+    let (r, g, b) = PALETTE_RGB[index as usize % PALETTE_RGB.len()];
     rgb_color(r, g, b)
 }
 
 pub fn output_txt(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
     let mut output = String::new();
+    let color_tracker = ColorTracker::compute_from_packets(packets, bytes.len());
+
+    // Track field colors for display
+    let mut field_color_index: u8 = 0;
 
     for packet in packets {
         if use_color {
@@ -32,8 +37,18 @@ pub fn output_txt(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
         // Skip the first field (packet header) as it's represented in the header line
         for field in packet.fields.iter().skip(1) {
             let indent = "  ".repeat(field.indent as usize);
+
+            // Get color for this field (only non-header fields get colors)
+            let field_color = if field.indent > 0 {
+                let c = field_color_index;
+                field_color_index = (field_color_index + 1) % 12;
+                Some(c)
+            } else {
+                None
+            };
+
             if use_color {
-                let color = field.color.map(palette_color).unwrap_or_default();
+                let color = field_color.map(palette_color).unwrap_or_default();
                 output.push_str(&format!(
                     "{}{}{}: {}{} {}[0x{:04X}-0x{:04X}]{}\n",
                     indent,
@@ -62,21 +77,12 @@ pub fn output_txt(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
     } else {
         output.push_str("--- Hex Dump ---\n");
     }
-    output.push_str(&format_hex_dump(packets, bytes, use_color));
+    output.push_str(&format_hex_dump(&color_tracker, bytes, use_color));
 
     output
 }
 
-fn get_byte_color(packets: &[Packet], byte_index: usize) -> Option<u8> {
-    for packet in packets {
-        if byte_index >= packet.start && byte_index < packet.end {
-            return packet.colors.get_color(byte_index);
-        }
-    }
-    None
-}
-
-fn format_hex_dump(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
+fn format_hex_dump(color_tracker: &ColorTracker, bytes: &[u8], use_color: bool) -> String {
     let mut output = String::new();
 
     for (i, chunk) in bytes.chunks(16).enumerate() {
@@ -97,7 +103,7 @@ fn format_hex_dump(packets: &[Packet], bytes: &[u8], use_color: bool) -> String 
             }
 
             if use_color {
-                let color = get_byte_color(packets, offset + j);
+                let color = color_tracker.get_color(offset + j);
                 if color != last_color {
                     if last_color.is_some() {
                         output.push_str(RESET);
@@ -137,7 +143,7 @@ fn format_hex_dump(packets: &[Packet], bytes: &[u8], use_color: bool) -> String 
         last_color = None;
         for (j, byte) in chunk.iter().enumerate() {
             if use_color {
-                let color = get_byte_color(packets, offset + j);
+                let color = color_tracker.get_color(offset + j);
                 if color != last_color {
                     if last_color.is_some() {
                         output.push_str(RESET);
@@ -237,25 +243,20 @@ pub fn output_json(packets: &[Packet], bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpg_inspector_lib::Field;
     use gpg_inspector_lib::packet::PacketBody;
     use gpg_inspector_lib::packet::tags::PacketTag;
-    use gpg_inspector_lib::{ColorTracker, Field, Packet};
 
     fn make_test_packet() -> Packet {
-        let mut colors = ColorTracker::new(10);
-        colors.set_field(2, 6); // color 0
-        colors.set_field(6, 10); // color 1
-
         Packet {
             start: 0,
             end: 10,
             tag: PacketTag::UserId,
             body: PacketBody::Unknown(vec![]),
-            colors,
             fields: vec![
                 Field::packet("Packet: User ID", "8 bytes", (0, 2)),
-                Field::field("User ID", "test", (2, 6), 0),
-                Field::subfield("Domain", "example.com", (6, 10), 1),
+                Field::field("User ID", "test", (2, 6)),
+                Field::subfield("Domain", "example.com", (6, 10)),
             ],
         }
     }
@@ -268,40 +269,42 @@ mod tests {
 
     #[test]
     fn test_palette_color() {
-        // First color in palette is orange (0xf3, 0x9c, 0x12)
+        // First color in palette is coral red (0xFF, 0x6B, 0x6B)
         let result = palette_color(0);
-        assert_eq!(result, "\x1b[38;2;243;156;18m");
+        assert_eq!(result, "\x1b[38;2;255;107;107m");
 
-        // Test wrapping (palette has 8 colors)
-        let result_wrapped = palette_color(8);
+        // Test wrapping (palette has 12 colors)
+        let result_wrapped = palette_color(12);
         assert_eq!(result_wrapped, palette_color(0));
     }
 
     #[test]
-    fn test_get_byte_color_in_packet() {
+    fn test_color_tracker_from_packets() {
         let packet = make_test_packet();
         let packets = vec![packet];
+        let tracker = ColorTracker::compute_from_packets(&packets, 10);
 
         // Byte 0-1 are header (no color)
-        assert_eq!(get_byte_color(&packets, 0), None);
-        assert_eq!(get_byte_color(&packets, 1), None);
+        assert_eq!(tracker.get_color(0), None);
+        assert_eq!(tracker.get_color(1), None);
 
         // Bytes 2-5 are field with color 0
-        assert_eq!(get_byte_color(&packets, 2), Some(0));
-        assert_eq!(get_byte_color(&packets, 5), Some(0));
+        assert_eq!(tracker.get_color(2), Some(0));
+        assert_eq!(tracker.get_color(5), Some(0));
 
         // Bytes 6-9 are subfield with color 1
-        assert_eq!(get_byte_color(&packets, 6), Some(1));
-        assert_eq!(get_byte_color(&packets, 9), Some(1));
+        assert_eq!(tracker.get_color(6), Some(1));
+        assert_eq!(tracker.get_color(9), Some(1));
     }
 
     #[test]
-    fn test_get_byte_color_outside_packet() {
+    fn test_get_byte_color_outside_range() {
         let packet = make_test_packet();
         let packets = vec![packet];
+        let tracker = ColorTracker::compute_from_packets(&packets, 10);
 
-        // Byte outside any packet
-        assert_eq!(get_byte_color(&packets, 100), None);
+        // Byte outside tracked range
+        assert_eq!(tracker.get_color(100), None);
     }
 
     #[test]
@@ -353,7 +356,8 @@ mod tests {
     #[test]
     fn test_hex_dump_full_line() {
         let bytes: Vec<u8> = (0..16).collect();
-        let result = format_hex_dump(&[], &bytes, false);
+        let tracker = ColorTracker::new(16);
+        let result = format_hex_dump(&tracker, &bytes, false);
 
         assert!(result.contains("00000000"));
         assert!(result.contains("00 01 02 03 04 05 06 07  08 09 0a 0b 0c 0d 0e 0f"));
@@ -363,7 +367,8 @@ mod tests {
     #[test]
     fn test_hex_dump_partial_line() {
         let bytes: Vec<u8> = vec![0x48, 0x65, 0x6c, 0x6c, 0x6f]; // "Hello"
-        let result = format_hex_dump(&[], &bytes, false);
+        let tracker = ColorTracker::new(5);
+        let result = format_hex_dump(&tracker, &bytes, false);
 
         assert!(result.contains("00000000"));
         assert!(result.contains("48 65 6c 6c 6f"));
@@ -373,7 +378,8 @@ mod tests {
     #[test]
     fn test_hex_dump_multiple_lines() {
         let bytes: Vec<u8> = (0..32).collect();
-        let result = format_hex_dump(&[], &bytes, false);
+        let tracker = ColorTracker::new(32);
+        let result = format_hex_dump(&tracker, &bytes, false);
 
         assert!(result.contains("00000000"));
         assert!(result.contains("00000010"));
@@ -382,7 +388,8 @@ mod tests {
     #[test]
     fn test_hex_dump_non_printable() {
         let bytes: Vec<u8> = vec![0x00, 0x1F, 0x7F, 0xFF];
-        let result = format_hex_dump(&[], &bytes, false);
+        let tracker = ColorTracker::new(4);
+        let result = format_hex_dump(&tracker, &bytes, false);
 
         // Non-printable characters should be replaced with '.'
         assert!(result.contains("|....|"));
@@ -392,8 +399,9 @@ mod tests {
     fn test_hex_dump_with_color() {
         let packet = make_test_packet();
         let bytes = vec![0xc6, 0x08, 0x74, 0x65, 0x73, 0x74, 0x40, 0x65, 0x78, 0x2e];
+        let tracker = ColorTracker::compute_from_packets(&[packet], bytes.len());
 
-        let result = format_hex_dump(&[packet], &bytes, true);
+        let result = format_hex_dump(&tracker, &bytes, true);
 
         // Check for ANSI codes
         assert!(result.contains(DIM)); // Address is dim
@@ -404,23 +412,23 @@ mod tests {
     #[test]
     fn test_hex_dump_color_transitions() {
         // Create a packet where colors change mid-line
-        let mut colors = ColorTracker::new(16);
-        colors.set_field(0, 4); // color 0
-        colors.set_field(4, 8); // color 1
-        colors.set_field(8, 12); // color 2
-        colors.set_field(12, 16); // color 3
-
         let packet = Packet {
             start: 0,
             end: 16,
             tag: PacketTag::LiteralData,
             body: PacketBody::Unknown(vec![]),
-            colors,
-            fields: vec![Field::packet("Packet", "16 bytes", (0, 2))],
+            fields: vec![
+                Field::packet("Packet", "16 bytes", (0, 2)),
+                Field::field("Field1", "data", (0, 4)),
+                Field::field("Field2", "data", (4, 8)),
+                Field::field("Field3", "data", (8, 12)),
+                Field::field("Field4", "data", (12, 16)),
+            ],
         };
 
         let bytes: Vec<u8> = (0..16).collect();
-        let result = format_hex_dump(&[packet], &bytes, true);
+        let tracker = ColorTracker::compute_from_packets(&[packet], bytes.len());
+        let result = format_hex_dump(&tracker, &bytes, true);
 
         // Should have multiple color codes (one for each field transition)
         let color_count = result.matches("\x1b[38;2;").count();
@@ -433,16 +441,15 @@ mod tests {
 
     #[test]
     fn test_output_txt_field_without_color() {
-        // Test field with color = None (header-style field)
+        // Test packet header field (indent == 0)
         let packet = Packet {
             start: 0,
             end: 5,
             tag: PacketTag::UserId,
             body: PacketBody::Unknown(vec![]),
-            colors: ColorTracker::new(5),
             fields: vec![
                 Field::packet("Packet: User ID", "3 bytes", (0, 2)),
-                Field::new("Note", "test", 1, (2, 5), None), // No color
+                Field::field("Note", "test", (2, 5)),
             ],
         };
 
@@ -453,6 +460,29 @@ mod tests {
         assert!(result.contains("Note: test"));
     }
 
+    #[test]
+    fn test_output_txt_non_first_field_with_indent_zero() {
+        // Test a field after the packet header that has indent 0 (unusual but tests the branch)
+        let packet = Packet {
+            start: 0,
+            end: 10,
+            tag: PacketTag::UserId,
+            body: PacketBody::Unknown(vec![]),
+            fields: vec![
+                Field::packet("Packet: User ID", "8 bytes", (0, 2)),
+                Field::new("Section", "data", 0, (2, 6)), // indent 0 non-header field
+                Field::field("Value", "test", (6, 10)),
+            ],
+        };
+
+        let bytes = vec![0xc6, 0x08, 0x74, 0x65, 0x73, 0x74, 0x40, 0x65, 0x78, 0x2e];
+        let result = output_txt(&[packet], &bytes, true);
+
+        // Both fields should be in output
+        assert!(result.contains("Section: data"));
+        assert!(result.contains("Value: test"));
+    }
+
     #[cfg(feature = "serde")]
     #[test]
     fn test_output_json_structure() {
@@ -461,10 +491,9 @@ mod tests {
             end: 10,
             tag: PacketTag::UserId,
             body: PacketBody::Unknown(vec![]),
-            colors: ColorTracker::new(10),
             fields: vec![
                 Field::packet("Packet: User ID", "5 bytes", (0, 2)),
-                Field::field("User ID", "test@example.com", (2, 10), 0),
+                Field::field("User ID", "test@example.com", (2, 10)),
             ],
         };
 

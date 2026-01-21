@@ -4,7 +4,6 @@
 //! Subpackets carry additional signature metadata like creation time,
 //! key expiration, preferred algorithms, and issuer identification.
 
-use crate::color::ColorTracker;
 use crate::error::{Error, Result};
 use crate::lookup::{
     lookup_compression_algorithm, lookup_hash_algorithm, lookup_key_flags,
@@ -137,13 +136,11 @@ pub enum SubpacketData {
 /// # Arguments
 ///
 /// * `stream` - Stream containing the subpacket data
-/// * `colors` - Color tracker for visualization
 /// * `fields` - Output field list
 /// * `prefix` - Label prefix ("Hashed" or "Unhashed")
 /// * `base_offset` - Byte offset for span calculation
 pub fn parse_subpackets(
     stream: &mut ByteStream,
-    colors: &mut ColorTracker,
     fields: &mut Vec<Field>,
     prefix: &str,
     base_offset: usize,
@@ -174,13 +171,7 @@ pub fn parse_subpackets(
 
         let (data, value) = parse_subpacket_data(packet_type, &mut sp_stream)?;
 
-        let color = colors.set_field(sp_start, sp_end);
-        fields.push(Field::subfield(
-            field_name,
-            value,
-            (sp_start, sp_end),
-            color,
-        ));
+        fields.push(Field::subfield(field_name, value, (sp_start, sp_end)));
 
         subpackets.push(Subpacket {
             packet_type,
