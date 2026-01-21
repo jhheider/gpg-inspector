@@ -1,8 +1,8 @@
 use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::lookup::{lookup_hash_algorithm, lookup_public_key_algorithm, lookup_signature_type};
-use crate::packet::subpackets::parse_subpackets;
 use crate::packet::Field;
+use crate::packet::subpackets::parse_subpackets;
 use crate::stream::ByteStream;
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,12 @@ pub fn parse_signature(
     let version = stream.octet()?;
     let version_end = offset + stream.pos();
     let color = colors.set_field(version_start, version_end);
-    fields.push(Field::field("Version", version.to_string(), (version_start, version_end), color));
+    fields.push(Field::field(
+        "Version",
+        version.to_string(),
+        (version_start, version_end),
+        color,
+    ));
 
     if version == 3 {
         return parse_v3_signature(stream, version, colors, fields, offset);
@@ -36,27 +41,47 @@ pub fn parse_signature(
     let sig_type_end = offset + stream.pos();
     let color = colors.set_field(sig_type_start, sig_type_end);
     let sig_type_info = lookup_signature_type(signature_type);
-    fields.push(Field::field("Signature Type", sig_type_info.display(), (sig_type_start, sig_type_end), color));
+    fields.push(Field::field(
+        "Signature Type",
+        sig_type_info.display(),
+        (sig_type_start, sig_type_end),
+        color,
+    ));
 
     let pub_algo_start = offset + stream.pos();
     let pub_algorithm = stream.octet()?;
     let pub_algo_end = offset + stream.pos();
     let color = colors.set_field(pub_algo_start, pub_algo_end);
     let pub_algo_info = lookup_public_key_algorithm(pub_algorithm);
-    fields.push(Field::field("Public Key Algorithm", pub_algo_info.display(), (pub_algo_start, pub_algo_end), color));
+    fields.push(Field::field(
+        "Public Key Algorithm",
+        pub_algo_info.display(),
+        (pub_algo_start, pub_algo_end),
+        color,
+    ));
 
     let hash_algo_start = offset + stream.pos();
     let hash_algorithm = stream.octet()?;
     let hash_algo_end = offset + stream.pos();
     let color = colors.set_field(hash_algo_start, hash_algo_end);
     let hash_algo_info = lookup_hash_algorithm(hash_algorithm);
-    fields.push(Field::field("Hash Algorithm", hash_algo_info.display(), (hash_algo_start, hash_algo_end), color));
+    fields.push(Field::field(
+        "Hash Algorithm",
+        hash_algo_info.display(),
+        (hash_algo_start, hash_algo_end),
+        color,
+    ));
 
     let hashed_len_start = offset + stream.pos();
     let hashed_len = stream.uint16()? as usize;
     let hashed_len_end = offset + stream.pos();
     let color = colors.set_field(hashed_len_start, hashed_len_end);
-    fields.push(Field::field("Hashed Subpackets", format!("{} bytes", hashed_len), (hashed_len_start, hashed_len_end), color));
+    fields.push(Field::field(
+        "Hashed Subpackets",
+        format!("{} bytes", hashed_len),
+        (hashed_len_start, hashed_len_end),
+        color,
+    ));
 
     let hashed_start = offset + stream.pos();
     let hashed_subpacket_data = stream.bytes(hashed_len)?;
@@ -68,13 +93,24 @@ pub fn parse_signature(
     let unhashed_len = stream.uint16()? as usize;
     let unhashed_len_end = offset + stream.pos();
     let color = colors.set_field(unhashed_len_start, unhashed_len_end);
-    fields.push(Field::field("Unhashed Subpackets", format!("{} bytes", unhashed_len), (unhashed_len_start, unhashed_len_end), color));
+    fields.push(Field::field(
+        "Unhashed Subpackets",
+        format!("{} bytes", unhashed_len),
+        (unhashed_len_start, unhashed_len_end),
+        color,
+    ));
 
     let unhashed_start = offset + stream.pos();
     let unhashed_subpacket_data = stream.bytes(unhashed_len)?;
 
     let mut unhashed_stream = ByteStream::new(unhashed_subpacket_data);
-    parse_subpackets(&mut unhashed_stream, colors, fields, "Unhashed", unhashed_start)?;
+    parse_subpackets(
+        &mut unhashed_stream,
+        colors,
+        fields,
+        "Unhashed",
+        unhashed_start,
+    )?;
 
     let prefix_start = offset + stream.pos();
     let hash_prefix = [stream.octet()?, stream.octet()?];
@@ -93,7 +129,12 @@ pub fn parse_signature(
     let color = colors.set_field(sig_start, sig_end);
 
     let sig_desc = format_signature_desc(pub_algorithm, &signature, stream);
-    fields.push(Field::field("Signature", sig_desc, (sig_start, sig_end), color));
+    fields.push(Field::field(
+        "Signature",
+        sig_desc,
+        (sig_start, sig_end),
+        color,
+    ));
 
     Ok(SignaturePacket {
         version,
@@ -119,33 +160,58 @@ fn parse_v3_signature(
     let sig_type_end = offset + stream.pos();
     let color = colors.set_field(sig_type_start, sig_type_end);
     let sig_type_info = lookup_signature_type(signature_type);
-    fields.push(Field::field("Signature Type", sig_type_info.display(), (sig_type_start, sig_type_end), color));
+    fields.push(Field::field(
+        "Signature Type",
+        sig_type_info.display(),
+        (sig_type_start, sig_type_end),
+        color,
+    ));
 
     let time_start = offset + stream.pos();
     let creation_time = stream.uint32()?;
     let time_end = offset + stream.pos();
     let color = colors.set_field(time_start, time_end);
-    fields.push(Field::field("Creation Time", creation_time.to_string(), (time_start, time_end), color));
+    fields.push(Field::field(
+        "Creation Time",
+        creation_time.to_string(),
+        (time_start, time_end),
+        color,
+    ));
 
     let key_id_start = offset + stream.pos();
     let key_id = stream.hex(8)?;
     let key_id_end = offset + stream.pos();
     let color = colors.set_field(key_id_start, key_id_end);
-    fields.push(Field::field("Key ID", key_id, (key_id_start, key_id_end), color));
+    fields.push(Field::field(
+        "Key ID",
+        key_id,
+        (key_id_start, key_id_end),
+        color,
+    ));
 
     let pub_algo_start = offset + stream.pos();
     let pub_algorithm = stream.octet()?;
     let pub_algo_end = offset + stream.pos();
     let color = colors.set_field(pub_algo_start, pub_algo_end);
     let pub_algo_info = lookup_public_key_algorithm(pub_algorithm);
-    fields.push(Field::field("Public Key Algorithm", pub_algo_info.display(), (pub_algo_start, pub_algo_end), color));
+    fields.push(Field::field(
+        "Public Key Algorithm",
+        pub_algo_info.display(),
+        (pub_algo_start, pub_algo_end),
+        color,
+    ));
 
     let hash_algo_start = offset + stream.pos();
     let hash_algorithm = stream.octet()?;
     let hash_algo_end = offset + stream.pos();
     let color = colors.set_field(hash_algo_start, hash_algo_end);
     let hash_algo_info = lookup_hash_algorithm(hash_algorithm);
-    fields.push(Field::field("Hash Algorithm", hash_algo_info.display(), (hash_algo_start, hash_algo_end), color));
+    fields.push(Field::field(
+        "Hash Algorithm",
+        hash_algo_info.display(),
+        (hash_algo_start, hash_algo_end),
+        color,
+    ));
 
     let prefix_start = offset + stream.pos();
     let hash_prefix = [stream.octet()?, stream.octet()?];
@@ -164,7 +230,12 @@ fn parse_v3_signature(
     let color = colors.set_field(sig_start, sig_end);
 
     let sig_desc = format_signature_desc(pub_algorithm, &signature, stream);
-    fields.push(Field::field("Signature", sig_desc, (sig_start, sig_end), color));
+    fields.push(Field::field(
+        "Signature",
+        sig_desc,
+        (sig_start, sig_end),
+        color,
+    ));
 
     Ok(SignaturePacket {
         version,

@@ -29,12 +29,22 @@ pub enum SubpacketData {
     SignatureExpirationTime(u32),
     KeyExpirationTime(u32),
     Exportable(bool),
-    Trust { level: u8, amount: u8 },
+    Trust {
+        level: u8,
+        amount: u8,
+    },
     Revocable(bool),
     PreferredSymmetric(Vec<u8>),
-    RevocationKey { class: u8, algo: u8, fingerprint: String },
+    RevocationKey {
+        class: u8,
+        algo: u8,
+        fingerprint: String,
+    },
     IssuerKeyId(String),
-    NotationData { name: String, value: String },
+    NotationData {
+        name: String,
+        value: String,
+    },
     PreferredHash(Vec<u8>),
     PreferredCompression(Vec<u8>),
     KeyServerPreferences(Vec<u8>),
@@ -43,13 +53,26 @@ pub enum SubpacketData {
     PolicyUri(String),
     KeyFlags(Vec<u8>),
     SignerUserId(String),
-    RevocationReason { code: u8, reason: String },
+    RevocationReason {
+        code: u8,
+        reason: String,
+    },
     Features(Vec<u8>),
-    SignatureTarget { algo: u8, hash_algo: u8, hash: String },
+    SignatureTarget {
+        algo: u8,
+        hash_algo: u8,
+        hash: String,
+    },
     EmbeddedSignature(Vec<u8>),
-    IssuerFingerprint { version: u8, fingerprint: String },
+    IssuerFingerprint {
+        version: u8,
+        fingerprint: String,
+    },
     PreferredAead(Vec<u8>),
-    IntendedRecipient { version: u8, fingerprint: String },
+    IntendedRecipient {
+        version: u8,
+        fingerprint: String,
+    },
     Unknown(Vec<u8>),
 }
 
@@ -87,7 +110,12 @@ pub fn parse_subpackets(
         let (data, value) = parse_subpacket_data(packet_type, &mut sp_stream)?;
 
         let color = colors.set_field(sp_start, sp_end);
-        fields.push(Field::subfield(field_name, value, (sp_start, sp_end), color));
+        fields.push(Field::subfield(
+            field_name,
+            value,
+            (sp_start, sp_end),
+            color,
+        ));
 
         subpackets.push(Subpacket {
             packet_type,
@@ -106,20 +134,32 @@ fn parse_subpacket_data(
     let (data, value) = match packet_type {
         2 => {
             let time = stream.uint32()?;
-            (SubpacketData::SignatureCreationTime(time), format_timestamp(time)?)
+            (
+                SubpacketData::SignatureCreationTime(time),
+                format_timestamp(time)?,
+            )
         }
         3 => {
             let time = stream.uint32()?;
-            (SubpacketData::SignatureExpirationTime(time), format_duration(time))
+            (
+                SubpacketData::SignatureExpirationTime(time),
+                format_duration(time),
+            )
         }
         4 => {
             let exportable = stream.octet()? != 0;
-            (SubpacketData::Exportable(exportable), exportable.to_string())
+            (
+                SubpacketData::Exportable(exportable),
+                exportable.to_string(),
+            )
         }
         5 => {
             let level = stream.octet()?;
             let amount = stream.octet()?;
-            (SubpacketData::Trust { level, amount }, format!("level={}, amount={}", level, amount))
+            (
+                SubpacketData::Trust { level, amount },
+                format!("level={}, amount={}", level, amount),
+            )
         }
         7 => {
             let revocable = stream.octet()? != 0;
@@ -127,11 +167,17 @@ fn parse_subpacket_data(
         }
         9 => {
             let time = stream.uint32()?;
-            (SubpacketData::KeyExpirationTime(time), format_duration(time))
+            (
+                SubpacketData::KeyExpirationTime(time),
+                format_duration(time),
+            )
         }
         11 => {
             let prefs = stream.rest();
-            let names: Vec<String> = prefs.iter().map(|&id| lookup_symmetric_algorithm(id).name).collect();
+            let names: Vec<String> = prefs
+                .iter()
+                .map(|&id| lookup_symmetric_algorithm(id).name)
+                .collect();
             (SubpacketData::PreferredSymmetric(prefs), names.join(", "))
         }
         12 => {
@@ -139,7 +185,14 @@ fn parse_subpacket_data(
             let algo = stream.octet()?;
             let fingerprint = stream.hex(20)?;
             let algo_name = lookup_public_key_algorithm(algo).name;
-            (SubpacketData::RevocationKey { class, algo, fingerprint: fingerprint.clone() }, format!("{} ({})", fingerprint, algo_name))
+            (
+                SubpacketData::RevocationKey {
+                    class,
+                    algo,
+                    fingerprint: fingerprint.clone(),
+                },
+                format!("{} ({})", fingerprint, algo_name),
+            )
         }
         16 => {
             let key_id = stream.hex(8)?;
@@ -160,17 +213,26 @@ fn parse_subpacket_data(
         }
         21 => {
             let prefs = stream.rest();
-            let names: Vec<String> = prefs.iter().map(|&id| lookup_hash_algorithm(id).name).collect();
+            let names: Vec<String> = prefs
+                .iter()
+                .map(|&id| lookup_hash_algorithm(id).name)
+                .collect();
             (SubpacketData::PreferredHash(prefs), names.join(", "))
         }
         22 => {
             let prefs = stream.rest();
-            let names: Vec<String> = prefs.iter().map(|&id| lookup_compression_algorithm(id).name).collect();
+            let names: Vec<String> = prefs
+                .iter()
+                .map(|&id| lookup_compression_algorithm(id).name)
+                .collect();
             (SubpacketData::PreferredCompression(prefs), names.join(", "))
         }
         23 => {
             let prefs = stream.rest();
-            (SubpacketData::KeyServerPreferences(prefs.clone()), format!("{} bytes", prefs.len()))
+            (
+                SubpacketData::KeyServerPreferences(prefs.clone()),
+                format!("{} bytes", prefs.len()),
+            )
         }
         24 => {
             let server = stream.utf8(stream.remaining())?;
@@ -186,7 +248,11 @@ fn parse_subpacket_data(
         }
         27 => {
             let flags_data = stream.rest();
-            let flags = if !flags_data.is_empty() { flags_data[0] } else { 0 };
+            let flags = if !flags_data.is_empty() {
+                flags_data[0]
+            } else {
+                0
+            };
             let flag_names = lookup_key_flags(flags);
             (SubpacketData::KeyFlags(flags_data), flag_names.join(", "))
         }
@@ -198,15 +264,27 @@ fn parse_subpacket_data(
             let code = stream.octet()?;
             let reason = stream.utf8(stream.remaining())?;
             let code_name = lookup_revocation_reason(code);
-            (SubpacketData::RevocationReason { code, reason: reason.clone() }, format!("{}: {}", code_name, reason))
+            (
+                SubpacketData::RevocationReason {
+                    code,
+                    reason: reason.clone(),
+                },
+                format!("{}: {}", code_name, reason),
+            )
         }
         30 => {
             let features = stream.rest();
             let mut feat_names = Vec::new();
             if !features.is_empty() {
-                if features[0] & 0x01 != 0 { feat_names.push("Modification Detection"); }
-                if features[0] & 0x02 != 0 { feat_names.push("AEAD"); }
-                if features[0] & 0x04 != 0 { feat_names.push("Version 5 Public Keys"); }
+                if features[0] & 0x01 != 0 {
+                    feat_names.push("Modification Detection");
+                }
+                if features[0] & 0x02 != 0 {
+                    feat_names.push("AEAD");
+                }
+                if features[0] & 0x04 != 0 {
+                    feat_names.push("Version 5 Public Keys");
+                }
             }
             (SubpacketData::Features(features), feat_names.join(", "))
         }
@@ -216,31 +294,59 @@ fn parse_subpacket_data(
             let hash = stream.rest_as_hex();
             let algo_name = lookup_public_key_algorithm(algo).name;
             let hash_name = lookup_hash_algorithm(hash_algo).name;
-            (SubpacketData::SignatureTarget { algo, hash_algo, hash: hash.clone() }, format!("{}/{}: {}", algo_name, hash_name, hash))
+            (
+                SubpacketData::SignatureTarget {
+                    algo,
+                    hash_algo,
+                    hash: hash.clone(),
+                },
+                format!("{}/{}: {}", algo_name, hash_name, hash),
+            )
         }
         32 => {
             let sig_data = stream.rest();
-            (SubpacketData::EmbeddedSignature(sig_data.clone()), format!("{} bytes", sig_data.len()))
+            (
+                SubpacketData::EmbeddedSignature(sig_data.clone()),
+                format!("{} bytes", sig_data.len()),
+            )
         }
         33 => {
             let version = stream.octet()?;
             let fp_len = if version == 4 { 20 } else { 32 };
             let fingerprint = stream.hex(fp_len.min(stream.remaining()))?;
-            (SubpacketData::IssuerFingerprint { version, fingerprint: fingerprint.clone() }, format!("v{}: {}", version, fingerprint))
+            (
+                SubpacketData::IssuerFingerprint {
+                    version,
+                    fingerprint: fingerprint.clone(),
+                },
+                format!("v{}: {}", version, fingerprint),
+            )
         }
         34 => {
             let prefs = stream.rest();
-            (SubpacketData::PreferredAead(prefs.clone()), format!("{} algorithms", prefs.len()))
+            (
+                SubpacketData::PreferredAead(prefs.clone()),
+                format!("{} algorithms", prefs.len()),
+            )
         }
         35 => {
             let version = stream.octet()?;
             let fp_len = if version == 4 { 20 } else { 32 };
             let fingerprint = stream.hex(fp_len.min(stream.remaining()))?;
-            (SubpacketData::IntendedRecipient { version, fingerprint: fingerprint.clone() }, format!("v{}: {}", version, fingerprint))
+            (
+                SubpacketData::IntendedRecipient {
+                    version,
+                    fingerprint: fingerprint.clone(),
+                },
+                format!("v{}: {}", version, fingerprint),
+            )
         }
         _ => {
             let data = stream.rest();
-            (SubpacketData::Unknown(data.clone()), format!("{} bytes", data.len()))
+            (
+                SubpacketData::Unknown(data.clone()),
+                format!("{} bytes", data.len()),
+            )
         }
     };
 

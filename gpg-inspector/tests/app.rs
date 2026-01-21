@@ -78,7 +78,11 @@ fn test_parse_input_parse_error() {
     app.parse_input();
     assert!(app.error_message.is_some(), "Should have error message");
     let msg = app.error_message.as_ref().unwrap();
-    assert!(msg.contains("Parse error"), "Should be Parse error: {}", msg);
+    assert!(
+        msg.contains("Parse error"),
+        "Should be Parse error: {}",
+        msg
+    );
 }
 
 #[test]
@@ -102,8 +106,7 @@ fn test_get_byte_color() {
 
     // Byte 0 should have a color (packet header)
     // Some bytes will have colors from parsed fields
-    let has_colors = (0..app.raw_bytes.len())
-        .any(|i| app.get_byte_color(i).is_some());
+    let has_colors = (0..app.raw_bytes.len()).any(|i| app.get_byte_color(i).is_some());
     assert!(has_colors);
 
     // Byte way beyond the data should return None

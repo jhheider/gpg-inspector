@@ -19,7 +19,12 @@ pub fn parse_user_id(
     let end = offset + stream.pos();
 
     let color = colors.set_field(start, end);
-    fields.push(Field::field("User ID", user_id.clone(), (start, end), color));
+    fields.push(Field::field(
+        "User ID",
+        user_id.clone(),
+        (start, end),
+        color,
+    ));
 
     Ok(UserIdPacket { user_id })
 }

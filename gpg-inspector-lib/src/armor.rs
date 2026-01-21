@@ -119,10 +119,9 @@ pub fn decode_armor(input: &str) -> Result<ArmorResult> {
         let checksum_b64 = &checksum_str[1..];
         let checksum_bytes = base64_decode(checksum_b64)?;
         if checksum_bytes.len() >= 3 {
-            let expected =
-                ((checksum_bytes[0] as u32) << 16)
-                    | ((checksum_bytes[1] as u32) << 8)
-                    | (checksum_bytes[2] as u32);
+            let expected = ((checksum_bytes[0] as u32) << 16)
+                | ((checksum_bytes[1] as u32) << 8)
+                | (checksum_bytes[2] as u32);
             let actual = crc24(&bytes);
             if expected != actual {
                 return Err(Error::ChecksumMismatch { expected, actual });

@@ -8,9 +8,10 @@ pub fn handle_event(app: &mut App, event: Event, size: Rect) {
     if let Event::Key(key) = event {
         handle_key(app, key, size);
     } else if let Event::Paste(text) = event
-        && app.focus == PanelFocus::Input {
-            app.paste_text(&text);
-        }
+        && app.focus == PanelFocus::Input
+    {
+        app.paste_text(&text);
+    }
 }
 
 fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
@@ -28,8 +29,7 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
             KeyCode::Char('k') if app.focus == PanelFocus::Input => {
                 app.clear_input();
             }
-            KeyCode::Char('v') if app.focus == PanelFocus::Input => {
-            }
+            KeyCode::Char('v') if app.focus == PanelFocus::Input => {}
             _ => {}
         }
         return;

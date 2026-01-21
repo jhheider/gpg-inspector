@@ -17,7 +17,11 @@ fn test_public_key_algorithm_all_values() {
     assert!(lookup_public_key_algorithm(18).name.contains("ECDH"));
     assert!(lookup_public_key_algorithm(19).name.contains("ECDSA"));
     assert!(lookup_public_key_algorithm(20).name.contains("Reserved"));
-    assert!(lookup_public_key_algorithm(21).name.contains("Diffie-Hellman"));
+    assert!(
+        lookup_public_key_algorithm(21)
+            .name
+            .contains("Diffie-Hellman")
+    );
     assert!(lookup_public_key_algorithm(22).name.contains("EdDSA"));
     assert!(lookup_public_key_algorithm(23).name.contains("AEDH"));
     assert!(lookup_public_key_algorithm(24).name.contains("AEDSA"));
@@ -102,7 +106,11 @@ fn test_hash_algorithm_all_values() {
 
 #[test]
 fn test_compression_algorithm_all_values() {
-    assert!(lookup_compression_algorithm(0).name.contains("Uncompressed"));
+    assert!(
+        lookup_compression_algorithm(0)
+            .name
+            .contains("Uncompressed")
+    );
     assert!(lookup_compression_algorithm(1).name.contains("ZIP"));
     assert!(lookup_compression_algorithm(2).name.contains("ZLIB"));
     assert!(lookup_compression_algorithm(3).name.contains("BZip2"));
@@ -133,8 +141,16 @@ fn test_signature_type_all_values() {
     assert!(lookup_signature_type(0x19).name.contains("Primary Key"));
     assert!(lookup_signature_type(0x1F).name.contains("Direct"));
     assert!(lookup_signature_type(0x20).name.contains("Key revocation"));
-    assert!(lookup_signature_type(0x28).name.contains("Subkey revocation"));
-    assert!(lookup_signature_type(0x30).name.contains("Certification revocation"));
+    assert!(
+        lookup_signature_type(0x28)
+            .name
+            .contains("Subkey revocation")
+    );
+    assert!(
+        lookup_signature_type(0x30)
+            .name
+            .contains("Certification revocation")
+    );
     assert!(lookup_signature_type(0x40).name.contains("Timestamp"));
     assert!(lookup_signature_type(0x50).name.contains("Third-Party"));
 
@@ -171,8 +187,16 @@ fn test_subpacket_type_all_values() {
     assert!(lookup_subpacket_type(20).name.contains("Notation"));
     assert!(lookup_subpacket_type(21).name.contains("Hash"));
     assert!(lookup_subpacket_type(22).name.contains("Compression"));
-    assert!(lookup_subpacket_type(23).name.contains("Key Server Preferences"));
-    assert!(lookup_subpacket_type(24).name.contains("Preferred Key Server"));
+    assert!(
+        lookup_subpacket_type(23)
+            .name
+            .contains("Key Server Preferences")
+    );
+    assert!(
+        lookup_subpacket_type(24)
+            .name
+            .contains("Preferred Key Server")
+    );
     assert!(lookup_subpacket_type(25).name.contains("Primary User"));
     assert!(lookup_subpacket_type(26).name.contains("Policy"));
     assert!(lookup_subpacket_type(27).name.contains("Key Flags"));
@@ -206,11 +230,26 @@ fn test_curve_oid_all_values() {
     assert!(lookup_curve_oid(&[0x2B, 0x81, 0x04, 0x00, 0x22]).contains("P-384"));
     assert!(lookup_curve_oid(&[0x2B, 0x81, 0x04, 0x00, 0x23]).contains("P-521"));
     assert!(lookup_curve_oid(&[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07]).contains("P-256"));
-    assert!(lookup_curve_oid(&[0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x07]).contains("brainpoolP256"));
-    assert!(lookup_curve_oid(&[0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0B]).contains("brainpoolP384"));
-    assert!(lookup_curve_oid(&[0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0D]).contains("brainpoolP512"));
-    assert!(lookup_curve_oid(&[0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01]).contains("Ed25519"));
-    assert!(lookup_curve_oid(&[0x2B, 0x06, 0x01, 0x04, 0x01, 0x97, 0x55, 0x01, 0x05, 0x01]).contains("Curve25519"));
+    assert!(
+        lookup_curve_oid(&[0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x07])
+            .contains("brainpoolP256")
+    );
+    assert!(
+        lookup_curve_oid(&[0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0B])
+            .contains("brainpoolP384")
+    );
+    assert!(
+        lookup_curve_oid(&[0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0D])
+            .contains("brainpoolP512")
+    );
+    assert!(
+        lookup_curve_oid(&[0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01])
+            .contains("Ed25519")
+    );
+    assert!(
+        lookup_curve_oid(&[0x2B, 0x06, 0x01, 0x04, 0x01, 0x97, 0x55, 0x01, 0x05, 0x01])
+            .contains("Curve25519")
+    );
 
     // Unknown OID
     let unknown = lookup_curve_oid(&[0x01, 0x02, 0x03]);

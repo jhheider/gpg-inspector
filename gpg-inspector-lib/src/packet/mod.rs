@@ -226,7 +226,12 @@ fn parse_packet_body(
                 let data_start = body_offset + stream.pos() - data.len();
                 let data_end = body_offset + stream.pos();
                 let color = colors.set_field(data_start, data_end);
-                fields.push(Field::field("Data", format!("{} bytes", data.len()), (data_start, data_end), color));
+                fields.push(Field::field(
+                    "Data",
+                    format!("{} bytes", data.len()),
+                    (data_start, data_end),
+                    color,
+                ));
             }
             Ok(PacketBody::Unknown(data))
         }

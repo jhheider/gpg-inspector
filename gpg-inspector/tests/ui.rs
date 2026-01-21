@@ -1,6 +1,6 @@
 use ratatui::layout::Rect;
 
-use gpg_inspector::ui::colors::{get_color, PALETTE};
+use gpg_inspector::ui::colors::{PALETTE, get_color};
 use gpg_inspector::ui::{get_data_panel_area, get_hex_panel_area};
 
 #[test]
@@ -41,7 +41,9 @@ fn test_layout_areas_valid() {
     assert!(data_area.height > 0);
 
     // Areas shouldn't overlap
-    assert!(hex_area.y + hex_area.height <= data_area.y || data_area.y + data_area.height <= hex_area.y);
+    assert!(
+        hex_area.y + hex_area.height <= data_area.y || data_area.y + data_area.height <= hex_area.y
+    );
 }
 
 #[test]

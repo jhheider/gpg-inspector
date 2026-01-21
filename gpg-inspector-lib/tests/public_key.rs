@@ -1,7 +1,7 @@
 //! Tests for public_key.rs - all key algorithm types
 
-use gpg_inspector_lib::parse_bytes;
 use gpg_inspector_lib::packet::tags::PacketTag;
+use gpg_inspector_lib::parse_bytes;
 
 /// Build a public key packet with the given algorithm and key material
 fn build_public_key_packet(algorithm: u8, key_material: &[u8]) -> Vec<u8> {
@@ -43,7 +43,7 @@ fn test_public_key_rsa() {
     // RSA: n (MPI) + e (MPI)
     let mut key_material = Vec::new();
     key_material.extend(build_mpi(16, &[0xAB, 0xCD])); // n: 16 bits
-    key_material.extend(build_mpi(8, &[0x11]));        // e: 8 bits
+    key_material.extend(build_mpi(8, &[0x11])); // e: 8 bits
 
     let packet = build_public_key_packet(1, &key_material);
     let result = parse_bytes(packet);
@@ -82,9 +82,9 @@ fn test_public_key_dsa() {
     // DSA: p, q, g, y (all MPIs)
     let mut key_material = Vec::new();
     key_material.extend(build_mpi(16, &[0x00, 0x01])); // p
-    key_material.extend(build_mpi(8, &[0x02]));        // q
-    key_material.extend(build_mpi(8, &[0x03]));        // g
-    key_material.extend(build_mpi(8, &[0x04]));        // y
+    key_material.extend(build_mpi(8, &[0x02])); // q
+    key_material.extend(build_mpi(8, &[0x03])); // g
+    key_material.extend(build_mpi(8, &[0x04])); // y
 
     let packet = build_public_key_packet(17, &key_material);
     let result = parse_bytes(packet);
@@ -100,8 +100,8 @@ fn test_public_key_elgamal() {
     // Elgamal: p, g, y (all MPIs)
     let mut key_material = Vec::new();
     key_material.extend(build_mpi(16, &[0x00, 0x01])); // p
-    key_material.extend(build_mpi(8, &[0x02]));        // g
-    key_material.extend(build_mpi(8, &[0x03]));        // y
+    key_material.extend(build_mpi(8, &[0x02])); // g
+    key_material.extend(build_mpi(8, &[0x03])); // y
 
     let packet = build_public_key_packet(16, &key_material);
     let result = parse_bytes(packet);
@@ -206,7 +206,11 @@ fn test_public_key_unknown_algorithm() {
 
     let packet = build_public_key_packet(99, &key_material);
     let result = parse_bytes(packet);
-    assert!(result.is_ok(), "Unknown algo parse failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Unknown algo parse failed: {:?}",
+        result.err()
+    );
 }
 
 // ============================================================================
@@ -248,7 +252,7 @@ fn test_secret_subkey_tag() {
     body.extend_from_slice(&[0x60, 0x00, 0x00, 0x00]); // Creation time
     body.push(1); // RSA
     body.extend(build_mpi(16, &[0xAB, 0xCD])); // n
-    body.extend(build_mpi(8, &[0x11]));        // e
+    body.extend(build_mpi(8, &[0x11])); // e
     body.push(0); // S2K usage = unencrypted
 
     packet.push(body.len() as u8);

@@ -4,7 +4,7 @@
 
 mod packets;
 
-use gpg_inspector_lib::{decode_armor, parse, parse_bytes, ByteStream, ColorTracker, PALETTE};
+use gpg_inspector_lib::{ByteStream, ColorTracker, PALETTE, decode_armor, parse, parse_bytes};
 
 const TEST_PUBLIC_KEY: &str = include_str!("../../fixtures/test.key");
 
@@ -70,7 +70,11 @@ fn test_parse_public_key_block() {
     assert!(!packets.is_empty(), "No packets parsed");
 
     // Should have multiple packets (public key, user ID, signatures)
-    assert!(packets.len() >= 3, "Expected at least 3 packets, got {}", packets.len());
+    assert!(
+        packets.len() >= 3,
+        "Expected at least 3 packets, got {}",
+        packets.len()
+    );
 }
 
 #[test]
@@ -133,7 +137,7 @@ fn test_color_tracker_rotation() {
 fn test_color_tracker_get_color() {
     let mut tracker = ColorTracker::new(50);
 
-    tracker.set_field(0, 10);  // Color 0
+    tracker.set_field(0, 10); // Color 0
     tracker.set_field(10, 20); // Color 1
 
     assert_eq!(tracker.get_color(5), Some(0));

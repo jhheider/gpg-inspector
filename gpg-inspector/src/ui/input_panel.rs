@@ -62,7 +62,8 @@ impl Widget for InputPanel<'_> {
             paragraph.render(inner, buf);
 
             if focused {
-                let (cursor_x, cursor_y) = calculate_cursor_position(text, self.app.cursor_pos, inner.width as usize);
+                let (cursor_x, cursor_y) =
+                    calculate_cursor_position(text, self.app.cursor_pos, inner.width as usize);
                 if cursor_y < inner.height as usize {
                     let x = inner.x + cursor_x as u16;
                     let y = inner.y + cursor_y as u16;

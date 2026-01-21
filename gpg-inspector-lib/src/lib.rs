@@ -7,7 +7,7 @@ pub mod stream;
 
 use std::sync::Arc;
 
-pub use armor::{decode_armor, ArmorResult};
+pub use armor::{ArmorResult, decode_armor};
 pub use color::{ColorTracker, PALETTE};
 pub use error::{Error, Result};
 pub use packet::{Field, Packet, PacketBody};

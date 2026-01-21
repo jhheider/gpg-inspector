@@ -4,8 +4,8 @@ pub mod hex_panel;
 pub mod input_panel;
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
     Frame,
+    layout::{Constraint, Direction, Layout, Rect},
 };
 
 use crate::app::App;

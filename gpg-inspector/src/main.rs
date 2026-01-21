@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use crossterm::{
     event::{DisableBracketedPaste, EnableBracketedPaste, poll, read},
@@ -18,12 +18,16 @@ use gpg_inspector::{event, ui};
 
 /// Interactive GPG/OpenPGP packet inspector
 #[derive(Parser)]
-#[command(version, about, after_help = "\
+#[command(
+    version,
+    about,
+    after_help = "\
 Examples:
   gpg-inspector                              Start with empty input
   gpg-inspector -f key.asc                   Load from file
   gpg --export --armor KEY | gpg-inspector   Read from stdin
-  cat message.asc | gpg-inspector            Pipe armored data")]
+  cat message.asc | gpg-inspector            Pipe armored data"
+)]
 struct Cli {
     /// Load GPG data from a file
     #[arg(short, long, value_name = "FILE")]
@@ -110,7 +114,9 @@ fn load_initial_input(cli: &Cli) -> Result<Option<String>> {
     let stdin = std::io::stdin();
     if !stdin.is_terminal() {
         let mut input = String::new();
-        stdin.lock().read_to_string(&mut input)
+        stdin
+            .lock()
+            .read_to_string(&mut input)
             .context("Failed to read from stdin")?;
         if !input.is_empty() {
             return Ok(Some(input));
@@ -122,7 +128,10 @@ fn load_initial_input(cli: &Cli) -> Result<Option<String>> {
 
 /// Requires TTY for terminal event loop
 #[cfg(not(tarpaulin_include))]
-fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
+fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &mut App,
+) -> Result<()> {
     loop {
         terminal.draw(|f| ui::draw(f, app))?;
 

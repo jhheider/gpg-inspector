@@ -1,7 +1,7 @@
 //! Tests for signature.rs - signature packets and all subpacket types
 
-use gpg_inspector_lib::parse_bytes;
 use gpg_inspector_lib::packet::tags::PacketTag;
+use gpg_inspector_lib::parse_bytes;
 
 /// Build a v4 signature packet
 fn build_signature_packet(
@@ -165,7 +165,11 @@ fn test_signature_unknown_algorithm() {
 
     let packet = build_signature_packet(0x00, 99, 8, &[], &[], &sig_data);
     let result = parse_bytes(packet);
-    assert!(result.is_ok(), "Unknown algo sig failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Unknown algo sig failed: {:?}",
+        result.err()
+    );
 }
 
 // ============================================================================
@@ -291,7 +295,7 @@ fn test_subpacket_preferred_symmetric() {
 fn test_subpacket_revocation_key() {
     let mut data = Vec::new();
     data.push(0x80); // class
-    data.push(1);    // RSA
+    data.push(1); // RSA
     data.extend_from_slice(&[0u8; 20]); // fingerprint
     let sp = build_subpacket(12, &data);
     let packet = build_signature_packet(0x00, 1, 8, &sp, &[], &build_mpi(8, &[0x01]));
@@ -420,8 +424,8 @@ fn test_subpacket_features_empty() {
 #[test]
 fn test_subpacket_signature_target() {
     let mut data = Vec::new();
-    data.push(1);  // RSA
-    data.push(8);  // SHA-256
+    data.push(1); // RSA
+    data.push(8); // SHA-256
     data.extend_from_slice(&[0u8; 32]); // hash
     let sp = build_subpacket(31, &data);
     let packet = build_signature_packet(0x00, 1, 8, &sp, &[], &build_mpi(8, &[0x01]));

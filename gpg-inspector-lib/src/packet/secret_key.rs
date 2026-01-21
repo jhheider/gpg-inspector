@@ -1,8 +1,8 @@
 use crate::color::ColorTracker;
 use crate::error::Result;
 use crate::lookup::{lookup_s2k_type, lookup_symmetric_algorithm};
-use crate::packet::public_key::{parse_public_key, PublicKeyPacket};
 use crate::packet::Field;
+use crate::packet::public_key::{PublicKeyPacket, parse_public_key};
 use crate::stream::ByteStream;
 
 #[derive(Debug, Clone)]
@@ -42,7 +42,12 @@ pub fn parse_secret_key(
         255 => "Checksum, encrypted".to_string(),
         n => format!("Symmetric algorithm {}", n),
     };
-    fields.push(Field::field("S2K Usage", s2k_desc, (s2k_start, s2k_end), color));
+    fields.push(Field::field(
+        "S2K Usage",
+        s2k_desc,
+        (s2k_start, s2k_end),
+        color,
+    ));
 
     let encryption_info = if s2k_usage == 254 || s2k_usage == 255 {
         let cipher_start = offset + stream.pos();
@@ -50,13 +55,23 @@ pub fn parse_secret_key(
         let cipher_end = offset + stream.pos();
         let color = colors.set_field(cipher_start, cipher_end);
         let cipher_info = lookup_symmetric_algorithm(cipher_algo);
-        fields.push(Field::field("Cipher", cipher_info.display(), (cipher_start, cipher_end), color));
+        fields.push(Field::field(
+            "Cipher",
+            cipher_info.display(),
+            (cipher_start, cipher_end),
+            color,
+        ));
 
         let s2k_type_start = offset + stream.pos();
         let s2k_type = stream.octet()?;
         let s2k_type_end = offset + stream.pos();
         let color = colors.set_field(s2k_type_start, s2k_type_end);
-        fields.push(Field::field("S2K Type", lookup_s2k_type(s2k_type).to_string(), (s2k_type_start, s2k_type_end), color));
+        fields.push(Field::field(
+            "S2K Type",
+            lookup_s2k_type(s2k_type).to_string(),
+            (s2k_type_start, s2k_type_end),
+            color,
+        ));
 
         let s2k_hash_start = offset + stream.pos();
         let s2k_hash = stream.octet()?;
@@ -68,7 +83,12 @@ pub fn parse_secret_key(
             let salt = stream.bytes(8)?;
             let salt_end = offset + stream.pos();
             let color = colors.set_field(salt_start, salt_end);
-            fields.push(Field::field("S2K Salt", "8 bytes", (salt_start, salt_end), color));
+            fields.push(Field::field(
+                "S2K Salt",
+                "8 bytes",
+                (salt_start, salt_end),
+                color,
+            ));
 
             let count = if s2k_type == 3 {
                 let count_start = offset + stream.pos();
@@ -76,7 +96,12 @@ pub fn parse_secret_key(
                 let count_end = offset + stream.pos();
                 let color = colors.set_field(count_start, count_end);
                 let iterations = (16u32 + (c as u32 & 15)) << ((c >> 4) + 6);
-                fields.push(Field::field("S2K Iterations", iterations.to_string(), (count_start, count_end), color));
+                fields.push(Field::field(
+                    "S2K Iterations",
+                    iterations.to_string(),
+                    (count_start, count_end),
+                    color,
+                ));
                 Some(c)
             } else {
                 None
@@ -95,7 +120,12 @@ pub fn parse_secret_key(
         let iv = stream.bytes(iv_size)?;
         let iv_end = offset + stream.pos();
         let color = colors.set_field(iv_start, iv_end);
-        fields.push(Field::field("IV", format!("{} bytes", iv.len()), (iv_start, iv_end), color));
+        fields.push(Field::field(
+            "IV",
+            format!("{} bytes", iv.len()),
+            (iv_start, iv_end),
+            color,
+        ));
 
         Some(EncryptionInfo {
             cipher_algo,

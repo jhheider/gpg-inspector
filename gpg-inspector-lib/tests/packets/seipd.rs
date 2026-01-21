@@ -39,7 +39,10 @@ fn test_seipd_v1() {
     let result = parse_bytes(packet);
     assert!(result.is_ok(), "Failed: {:?}", result.err());
     let packets = result.unwrap();
-    assert_eq!(packets[0].tag, PacketTag::SymmetricallyEncryptedIntegrityProtectedData);
+    assert_eq!(
+        packets[0].tag,
+        PacketTag::SymmetricallyEncryptedIntegrityProtectedData
+    );
 }
 
 #[test]

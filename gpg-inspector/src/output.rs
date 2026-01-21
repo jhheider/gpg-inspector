@@ -1,4 +1,4 @@
-use gpg_inspector_lib::{Packet, PALETTE};
+use gpg_inspector_lib::{PALETTE, Packet};
 
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
@@ -36,7 +36,15 @@ pub fn output_txt(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
                 let color = field.color.map(palette_color).unwrap_or_default();
                 output.push_str(&format!(
                     "{}{}{}: {}{} {}[0x{:04X}-0x{:04X}]{}\n",
-                    indent, color, field.name, field.value, RESET, DIM, field.span.0, field.span.1, RESET
+                    indent,
+                    color,
+                    field.name,
+                    field.value,
+                    RESET,
+                    DIM,
+                    field.span.0,
+                    field.span.1,
+                    RESET
                 ));
             } else {
                 output.push_str(&format!(
@@ -229,13 +237,13 @@ pub fn output_json(packets: &[Packet], bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpg_inspector_lib::{ColorTracker, Field, Packet};
-    use gpg_inspector_lib::packet::tags::PacketTag;
     use gpg_inspector_lib::packet::PacketBody;
+    use gpg_inspector_lib::packet::tags::PacketTag;
+    use gpg_inspector_lib::{ColorTracker, Field, Packet};
 
     fn make_test_packet() -> Packet {
         let mut colors = ColorTracker::new(10);
-        colors.set_field(2, 6);  // color 0
+        colors.set_field(2, 6); // color 0
         colors.set_field(6, 10); // color 1
 
         Packet {
@@ -388,7 +396,7 @@ mod tests {
         let result = format_hex_dump(&[packet], &bytes, true);
 
         // Check for ANSI codes
-        assert!(result.contains(DIM));   // Address is dim
+        assert!(result.contains(DIM)); // Address is dim
         assert!(result.contains(RESET)); // Reset codes present
         assert!(result.contains("\x1b[38;2;")); // Color codes for bytes
     }
@@ -397,9 +405,9 @@ mod tests {
     fn test_hex_dump_color_transitions() {
         // Create a packet where colors change mid-line
         let mut colors = ColorTracker::new(16);
-        colors.set_field(0, 4);   // color 0
-        colors.set_field(4, 8);   // color 1
-        colors.set_field(8, 12);  // color 2
+        colors.set_field(0, 4); // color 0
+        colors.set_field(4, 8); // color 1
+        colors.set_field(8, 12); // color 2
         colors.set_field(12, 16); // color 3
 
         let packet = Packet {
@@ -416,7 +424,11 @@ mod tests {
 
         // Should have multiple color codes (one for each field transition)
         let color_count = result.matches("\x1b[38;2;").count();
-        assert!(color_count >= 4, "Expected at least 4 color codes, got {}", color_count);
+        assert!(
+            color_count >= 4,
+            "Expected at least 4 color codes, got {}",
+            color_count
+        );
     }
 
     #[test]
@@ -469,6 +481,9 @@ mod tests {
         assert_eq!(packets.len(), 1);
 
         let first_packet = &packets[0];
-        assert_eq!(first_packet.get("tag").unwrap().as_str().unwrap(), "User ID");
+        assert_eq!(
+            first_packet.get("tag").unwrap().as_str().unwrap(),
+            "User ID"
+        );
     }
 }

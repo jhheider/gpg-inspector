@@ -42,7 +42,10 @@ impl Widget for HexPanel<'_> {
         let visible_lines = inner.height as usize;
         let total_lines = self.app.raw_bytes.len().div_ceil(bytes_per_line);
 
-        let start_line = self.app.hex_scroll.min(total_lines.saturating_sub(visible_lines));
+        let start_line = self
+            .app
+            .hex_scroll
+            .min(total_lines.saturating_sub(visible_lines));
         let end_line = (start_line + visible_lines).min(total_lines);
 
         for (line_idx, line_num) in (start_line..end_line).enumerate() {

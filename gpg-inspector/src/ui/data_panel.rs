@@ -49,7 +49,10 @@ impl Widget for DataPanel<'_> {
         let visible_lines = inner.height as usize;
         let total_lines = fields.len();
 
-        let start_line = self.app.data_scroll.min(total_lines.saturating_sub(visible_lines));
+        let start_line = self
+            .app
+            .data_scroll
+            .min(total_lines.saturating_sub(visible_lines));
         let end_line = (start_line + visible_lines).min(total_lines);
 
         for (line_idx, field_idx) in (start_line..end_line).enumerate() {
@@ -78,9 +81,7 @@ impl Widget for DataPanel<'_> {
             };
 
             let value_style = if is_selected {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::DarkGray)
+                Style::default().fg(Color::Black).bg(Color::DarkGray)
             } else {
                 Style::default().fg(Color::Gray)
             };
@@ -103,7 +104,10 @@ impl Widget for DataPanel<'_> {
 
             let spans = vec![
                 Span::raw(&indent_str),
-                Span::styled(format!("{:<width$}", truncated_name, width = name_width), name_style),
+                Span::styled(
+                    format!("{:<width$}", truncated_name, width = name_width),
+                    name_style,
+                ),
                 Span::styled(" : ", Style::default().fg(Color::DarkGray)),
                 Span::styled(truncated_value, value_style),
             ];
