@@ -1,3 +1,8 @@
+[![Coverage Status](https://coveralls.io/repos/github/jhheider/gpg-inspector/badge.svg?branch=main)](https://coveralls.io/github/jhheider/gpg-inspector?branch=main)
+[![Test Status](https://github.com/jhheider/gpg-inspector/actions/workflows/test.yml/badge.svg)](https://github.com/jhheider/gpg-inspector/actions/workflows/test.yml)
+[![Checks](https://github.com/jhheider/gpg-inspector/actions/workflows/check-and-lint.yaml/badge.svg)](https://github.com/jhheider/gpg-inspector/actions/workflows/check-and-lint.yaml)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 # gpg-inspector
 
 A terminal user interface for inspecting GPG/OpenPGP packet structures. Decode armored GPG data and visualize the underlying packet format with color-coded byte highlighting.
