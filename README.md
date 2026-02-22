@@ -19,20 +19,32 @@ Inspired by [ConradIrwin/gpg-decoder](https://github.com/ConradIrwin/gpg-decoder
 
 ## Installation
 
+### Prebuilt binaries
+
+Download the latest release for your platform from the
+[releases page](https://github.com/jhheider/gpg-inspector/releases):
+
+| Platform | Download |
+|----------|---------|
+| Linux x86_64 | `gpg-inspector-linux-x86_64.tar.gz` |
+| Linux aarch64 | `gpg-inspector-linux-aarch64.tar.gz` |
+| macOS x86_64 | `gpg-inspector-macos-x86_64.tar.gz` |
+| macOS Apple Silicon | `gpg-inspector-macos-aarch64.tar.gz` |
+| Windows x86_64 | `gpg-inspector-windows-x86_64.zip` |
+
+```bash
+# Linux / macOS
+tar xzf gpg-inspector-*.tar.gz
+sudo mv gpg-inspector /usr/local/bin/
+```
+
 ### From source
 
 ```bash
 git clone https://github.com/jhheider/gpg-inspector
 cd gpg-inspector
 cargo build --release
-```
-
-The binary will be at `target/release/gpg-inspector`.
-
-### Running directly
-
-```bash
-cargo run --release
+# binary at target/release/gpg-inspector
 ```
 
 ## Usage
