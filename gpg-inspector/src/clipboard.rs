@@ -8,6 +8,7 @@
 /// Copy payloads are truncated to this size: many terminals cap OSC 52
 /// around 100 KB, and oversized sequences can be dropped entirely.
 pub const MAX_COPY_BYTES: usize = 64 * 1024;
+const _: () = assert!(MAX_COPY_BYTES <= 100 * 1024);
 
 const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 

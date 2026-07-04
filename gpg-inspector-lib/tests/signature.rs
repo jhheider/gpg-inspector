@@ -15,11 +15,7 @@ fn build_signature_packet(
     let mut packet = Vec::new();
     packet.push(0xC0 | 2); // Tag 2 = Signature
 
-    let mut body = Vec::new();
-    body.push(4); // Version 4
-    body.push(sig_type);
-    body.push(pub_algo);
-    body.push(hash_algo);
+    let mut body = vec![4, sig_type, pub_algo, hash_algo];
 
     // Hashed subpackets
     body.extend_from_slice(&(hashed_subpackets.len() as u16).to_be_bytes());
@@ -535,11 +531,7 @@ fn build_v6_signature_packet(
     let mut packet = Vec::new();
     packet.push(0xC0 | 2); // Tag 2 = Signature
 
-    let mut body = Vec::new();
-    body.push(6); // Version 6
-    body.push(sig_type);
-    body.push(pub_algo);
-    body.push(hash_algo);
+    let mut body = vec![6, sig_type, pub_algo, hash_algo];
 
     // V6: 4-byte hashed subpacket length
     body.extend_from_slice(&(hashed_subpackets.len() as u32).to_be_bytes());

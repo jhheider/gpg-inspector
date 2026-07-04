@@ -97,10 +97,8 @@ fn test_new_format_five_byte_length() {
 #[test]
 fn test_new_format_partial_length() {
     // Partial body length: first byte 224-254 means 2^(first & 0x1F) bytes
-    let mut packet = Vec::new();
-    packet.push(0xC0 | 13); // User ID
-    packet.push(224); // 2^(224 & 0x1F) = 2^0 = 1 byte
-    packet.push(b'X');
+    // User ID; partial length 224 = 2^(224 & 0x1F) = 1 byte
+    let packet = vec![0xC0 | 13, 224, b'X'];
 
     let result = parse_bytes(packet);
     assert!(result.is_ok(), "Failed: {:?}", result.err());
@@ -125,7 +123,7 @@ fn test_unknown_packet_type() {
 #[test]
 fn test_reserved_packet_type() {
     let mut packet = Vec::new();
-    packet.push(0xC0 | 0); // Tag 0 = Reserved
+    packet.push(0xC0); // Tag 0 = Reserved
     packet.push(3);
     packet.extend_from_slice(&[0x01, 0x02, 0x03]);
 

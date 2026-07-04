@@ -23,7 +23,7 @@ Inspired by [ConradIrwin/gpg-decoder](https://github.com/ConradIrwin/gpg-decoder
 - Copy field values or raw bytes to the clipboard via OSC 52 (`y` / `Y`)
 - Mouse support: click to focus/select, wheel to scroll
 - Dark and light themes (`--theme auto|dark|light`, auto-detected from `COLORFGBG`)
-- Old and new OpenPGP packet formats, packet versions v3 through v6 (RFC 4880 and RFC 9580)
+- Old and new OpenPGP packet formats: v4/v6 keys, v3/v4/v6 signatures (RFC 4880 and RFC 9580)
 - Scriptable text and JSON output modes (`--txt`, `--json`)
 - CRC24 checksum validation for armored input
 
@@ -151,7 +151,7 @@ Every exportable packet type defined by RFC 4880 and RFC 9580 is parsed (see
 [RFC9580_COMPLIANCE.md](RFC9580_COMPLIANCE.md) for the full compliance tables):
 
 - Public Key / Public Subkey and Secret Key / Secret Subkey (v3–v6)
-- Signature (v3, v4, v5, v6) with all subpacket types
+- Signature (v3, v4, v6) with all subpacket types
 - One-Pass Signature
 - Public Key Encrypted Session Key (PKESK)
 - Symmetric-Key Encrypted Session Key (SKESK)

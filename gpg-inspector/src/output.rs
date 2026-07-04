@@ -604,7 +604,7 @@ mod tests {
         let cd = &parsed["packets"][0];
         assert_eq!(cd["tag"], "Compressed Data");
         assert_eq!(cd["children"][0]["tag"], "Literal Data");
-        assert!(cd["decompressed_bytes"].as_str().unwrap().len() > 0);
+        assert!(!cd["decompressed_bytes"].as_str().unwrap().is_empty());
         // Plain packets omit the nested keys entirely
         assert!(parsed["blocks"].is_null());
         assert!(parsed["cleartext"].is_null());

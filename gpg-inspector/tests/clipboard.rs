@@ -1,6 +1,6 @@
 //! Tests for OSC 52 clipboard encoding.
 
-use gpg_inspector::clipboard::{MAX_COPY_BYTES, base64_encode, osc52_sequence};
+use gpg_inspector::clipboard::{base64_encode, osc52_sequence};
 
 #[test]
 fn test_base64_vectors() {
@@ -25,9 +25,4 @@ fn test_osc52_sequence_shape() {
     assert!(seq.starts_with("\x1b]52;c;"));
     assert!(seq.ends_with('\x07'));
     assert!(seq.contains("aGVsbG8="));
-}
-
-#[test]
-fn test_max_copy_is_terminal_safe() {
-    assert!(MAX_COPY_BYTES <= 100 * 1024);
 }

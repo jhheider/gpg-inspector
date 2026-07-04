@@ -103,11 +103,8 @@ mod decompress {
 
     /// A minimal Literal Data packet (tag 11) holding `data`.
     fn build_literal_packet(data: &[u8]) -> Vec<u8> {
-        let mut packet = Vec::new();
-        packet.push(0xC0 | 11);
-        packet.push((1 + 1 + 4 + data.len()) as u8);
-        packet.push(b'b'); // format: binary
-        packet.push(0); // filename length
+        // Tag 11; body = format + filename len + date + data
+        let mut packet = vec![0xC0 | 11, (1 + 1 + 4 + data.len()) as u8, b'b', 0];
         packet.extend_from_slice(&[0, 0, 0, 0]); // date
         packet.extend_from_slice(data);
         packet
