@@ -59,17 +59,30 @@ fn main() -> Result<()> {
 
     if wants_output {
         let input = initial_input.ok_or_else(|| anyhow!("No input provided"))?;
-        let armor = gpg_inspector_lib::decode_armor(&input)?;
-        let packets = gpg_inspector_lib::parse_bytes(Arc::clone(&armor.bytes))?;
+        let (bytes, blocks, cleartext): (Arc<[u8]>, _, _) =
+            if gpg_inspector_lib::looks_binary(&input) {
+                (input.into(), Vec::new(), None)
+            } else {
+                let text = String::from_utf8(input)
+                    .map_err(|_| anyhow!("Input is neither binary PGP data nor valid UTF-8"))?;
+                let multi = gpg_inspector_lib::decode_armor_multi(&text)?;
+                (multi.bytes, multi.blocks, multi.cleartext)
+            };
+        let packets = gpg_inspector_lib::parse_bytes(Arc::clone(&bytes))?;
 
         #[cfg(feature = "serde")]
         if cli.json {
-            println!("{}", output::output_json(&packets, &armor.bytes));
+            println!(
+                "{}",
+                output::output_json(&packets, &bytes, &blocks, cleartext.as_deref())
+            );
             return Ok(());
         }
+        #[cfg(not(feature = "serde"))]
+        let _ = (&blocks, &cleartext);
 
         let use_color = std::io::stdout().is_terminal();
-        println!("{}", output::output_txt(&packets, &armor.bytes, use_color));
+        println!("{}", output::output_txt(&packets, &bytes, use_color));
         return Ok(());
     }
 
@@ -82,9 +95,19 @@ fn main() -> Result<()> {
 
     let mut app = App::new();
     if let Some(input) = initial_input {
-        app.input = input;
-        app.cursor_pos = app.input.len();
-        app.parse_input();
+        if gpg_inspector_lib::looks_binary(&input) {
+            let origin = cli
+                .file
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "stdin".to_string());
+            app.load_binary(input, origin);
+        } else {
+            app.input = String::from_utf8(input)
+                .map_err(|_| anyhow!("Input is neither binary PGP data nor valid UTF-8"))?;
+            app.cursor_pos = app.input.len();
+            app.parse_input();
+        }
     }
 
     let result = run_app(&mut terminal, &mut app);
@@ -102,10 +125,10 @@ fn main() -> Result<()> {
 
 /// Requires stdin/file I/O mocking
 #[cfg(not(tarpaulin_include))]
-fn load_initial_input(cli: &Cli) -> Result<Option<String>> {
+fn load_initial_input(cli: &Cli) -> Result<Option<Vec<u8>>> {
     // File takes precedence
     if let Some(path) = &cli.file {
-        let content = std::fs::read_to_string(path)
+        let content = std::fs::read(path)
             .with_context(|| format!("Failed to read file: {}", path.display()))?;
         return Ok(Some(content));
     }
@@ -113,10 +136,10 @@ fn load_initial_input(cli: &Cli) -> Result<Option<String>> {
     // Check if stdin has data (not a terminal)
     let stdin = std::io::stdin();
     if !stdin.is_terminal() {
-        let mut input = String::new();
+        let mut input = Vec::new();
         stdin
             .lock()
-            .read_to_string(&mut input)
+            .read_to_end(&mut input)
             .context("Failed to read from stdin")?;
         if !input.is_empty() {
             return Ok(Some(input));

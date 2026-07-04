@@ -37,7 +37,7 @@ This is a Rust workspace with two crates:
 
 ### gpg-inspector-lib (parsing library)
 
-The library parses OpenPGP packets per RFC 4880/9580. It does NOT perform cryptographic operations—it only extracts and displays packet structure.
+The library parses OpenPGP packets per RFC 4880/9580. It does NOT perform cryptographic operations—it only extracts and displays packet structure. The single deliberate exception is hashing for key *identity*: computed fingerprints (SHA-1 for v4, SHA-256 for v6) and key IDs are emitted as `(computed)` fields. Never decryption, signature verification, or key generation. Decompression of Compressed Data packets (feature `decompress`, default on) is also structural, capped at 64 MiB and 4 nesting levels.
 
 **Key modules:**
 - `armor.rs` - ASCII armor decoding (Base64 + CRC24)

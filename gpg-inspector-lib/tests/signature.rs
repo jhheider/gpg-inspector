@@ -541,9 +541,6 @@ fn build_v6_signature_packet(
     body.push(pub_algo);
     body.push(hash_algo);
 
-    // V6: Salt (length depends on hash algorithm)
-    body.extend(vec![0u8; salt_len]);
-
     // V6: 4-byte hashed subpacket length
     body.extend_from_slice(&(hashed_subpackets.len() as u32).to_be_bytes());
     body.extend_from_slice(hashed_subpackets);
@@ -554,6 +551,10 @@ fn build_v6_signature_packet(
 
     // Hash prefix (2 bytes)
     body.extend_from_slice(&[0xAB, 0xCD]);
+
+    // V6: one-octet salt size, then the salt (RFC 9580 §5.2.3)
+    body.push(salt_len as u8);
+    body.extend(vec![0u8; salt_len]);
 
     // Signature data
     body.extend_from_slice(signature_data);

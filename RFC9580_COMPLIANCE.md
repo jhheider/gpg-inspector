@@ -65,15 +65,19 @@ V6 signatures have significant changes from V4:
 | Signature Type | 1 octet | ✅ Parsed | |
 | Public Key Algorithm | 1 octet | ✅ Parsed | |
 | Hash Algorithm | 1 octet | ✅ Parsed | |
-| Salt | 16-32 octets | ✅ Parsed | Length depends on hash algorithm |
 | Hashed Subpacket Length | 4 octets | ✅ Parsed | (was 2 octets in V4) |
 | Hashed Subpackets | Variable | ✅ Parsed | |
 | Unhashed Subpacket Length | 4 octets | ✅ Parsed | (was 2 octets in V4) |
 | Unhashed Subpackets | Variable | ✅ Parsed | |
 | Hash Prefix | 2 octets | ✅ Parsed | |
+| Salt Size | 1 octet | ✅ Parsed | RFC 9580 §5.2.3; must match hash algorithm |
+| Salt | 16-32 octets | ✅ Parsed | Mismatched sizes flagged, not rejected |
 | Signature Data | Variable | ✅ Parsed | |
 
-### Salt Length by Hash Algorithm
+Verified against the RFC 9580 Appendix A.3 sample certificate (both
+fingerprints reproduce).
+
+### Expected Salt Length by Hash Algorithm
 
 | Hash Algorithm | Salt Length | Status |
 |----------------|-------------|--------|

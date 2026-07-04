@@ -35,7 +35,9 @@ pub mod stream;
 
 use std::sync::Arc;
 
-pub use armor::{ArmorResult, decode_armor};
+pub use armor::{
+    ArmorBlock, ArmorResult, MultiArmorResult, decode_armor, decode_armor_multi, looks_binary,
+};
 pub use error::{Error, Result};
 pub use packet::{Field, Packet, PacketBody};
 pub use stream::ByteStream;
@@ -64,7 +66,7 @@ pub use stream::ByteStream;
 /// }
 /// ```
 pub fn parse(input: &str) -> Result<Vec<Packet>> {
-    let armor_result = decode_armor(input)?;
+    let armor_result = decode_armor_multi(input)?;
     packet::parse_packets(armor_result.bytes)
 }
 

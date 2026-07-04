@@ -62,17 +62,17 @@ fn test_layout_small_terminal() {
 }
 
 fn make_test_packet() -> Packet {
-    Packet {
-        start: 0,
-        end: 10,
-        tag: PacketTag::UserId,
-        body: PacketBody::Unknown(vec![]),
-        fields: vec![
+    Packet::new(
+        0,
+        10,
+        PacketTag::UserId,
+        PacketBody::Unknown(vec![]),
+        vec![
             Field::packet("Packet: User ID", "8 bytes", (0, 2)),
             Field::field("User ID", "test", (2, 6)),
             Field::subfield("Domain", "example.com", (6, 10)),
         ],
-    }
+    )
 }
 
 #[test]
