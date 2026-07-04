@@ -25,22 +25,31 @@ impl<'a> HexPanel<'a> {
 #[cfg(not(tarpaulin_include))]
 impl Widget for HexPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Hex panel is display-only, not focusable
+        // Hex panel is display-only, not focusable. It shows the byte
+        // stream the selected row lives in (raw input, or a
+        // decompressed buffer for nested packets).
+        let title = if self.app.display_stream() > 0 {
+            let depth = self.app.selected_row().map(|r| r.depth).unwrap_or(1);
+            format!(" Hex View — decompressed (depth {}) ", depth)
+        } else {
+            " Hex View ".to_string()
+        };
         let block = Block::default()
-            .title(" Hex View ")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
 
         let inner = block.inner(area);
         block.render(area, buf);
 
-        if self.app.raw_bytes.is_empty() {
+        let bytes = std::sync::Arc::clone(self.app.display_bytes());
+        if bytes.is_empty() {
             return;
         }
 
         let bytes_per_line = 16;
         let visible_lines = inner.height as usize;
-        let total_lines = self.app.raw_bytes.len().div_ceil(bytes_per_line);
+        let total_lines = bytes.len().div_ceil(bytes_per_line);
 
         let start_line = self
             .app
@@ -55,7 +64,7 @@ impl Widget for HexPanel<'_> {
             }
 
             let start_byte = line_num * bytes_per_line;
-            let end_byte = (start_byte + bytes_per_line).min(self.app.raw_bytes.len());
+            let end_byte = (start_byte + bytes_per_line).min(bytes.len());
 
             let mut spans = Vec::new();
 
@@ -65,7 +74,7 @@ impl Widget for HexPanel<'_> {
             ));
 
             for i in start_byte..end_byte {
-                let byte = self.app.raw_bytes[i];
+                let byte = bytes[i];
 
                 let is_highlighted = self
                     .app
@@ -102,7 +111,7 @@ impl Widget for HexPanel<'_> {
             spans.push(Span::raw("  "));
 
             for i in start_byte..end_byte {
-                let byte = self.app.raw_bytes[i];
+                let byte = bytes[i];
                 let ch = if byte.is_ascii_graphic() || byte == b' ' {
                     byte as char
                 } else {

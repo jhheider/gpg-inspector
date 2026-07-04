@@ -1,6 +1,8 @@
 use ratatui::layout::Rect;
 
-use gpg_inspector::ui::colors::{ColorTracker, PALETTE, get_color, get_field_color_index};
+use gpg_inspector::app::App;
+use gpg_inspector::ui::colors::{ColorTracker, PALETTE, get_color};
+use gpg_inspector::ui::data_panel::truncate_chars;
 use gpg_inspector::ui::{get_data_panel_area, get_hex_panel_area};
 use gpg_inspector_lib::packet::PacketBody;
 use gpg_inspector_lib::packet::tags::PacketTag;
@@ -75,61 +77,41 @@ fn make_test_packet() -> Packet {
     )
 }
 
+/// Row colors: headers get none, non-header fields rotate, and the row
+/// assignment agrees with the byte-level ColorTracker.
 #[test]
-fn test_color_tracker_field_color_header() {
-    let field = Field::packet("Header", "value", (0, 2));
-    let color = ColorTracker::field_color(&field, 0);
-    assert_eq!(color, None); // Headers get no color
+fn test_row_colors_match_byte_tracker() {
+    let mut app = App::new();
+    app.packets = vec![make_test_packet()];
+    app.raw_bytes = std::sync::Arc::from([0u8; 10]);
+    app.rebuild_rows();
+
+    // Header row: no color
+    assert_eq!(app.rows[0].color, None);
+    assert_eq!(app.get_field_color(0), None);
+
+    // Field and subfield rotate 0, 1
+    assert_eq!(app.rows[1].color, Some(0));
+    assert_eq!(app.rows[2].color, Some(1));
+
+    // Byte tracker paints the same colors over the spans
+    let tracker = ColorTracker::compute_from_packets(&app.packets, 10);
+    assert_eq!(tracker.get_color(2), app.rows[1].color);
+    assert_eq!(tracker.get_color(6), app.rows[2].color);
+    assert_eq!(tracker.get_color(0), None);
+
+    // And the app's per-stream tracker agrees byte-for-byte
+    for i in 0..10 {
+        assert_eq!(app.color_trackers[0].get_color(i), tracker.get_color(i));
+    }
 }
 
 #[test]
-fn test_color_tracker_field_color_regular_field() {
-    let field = Field::field("Name", "value", (0, 2));
-    let color = ColorTracker::field_color(&field, 0);
-    assert_eq!(color, Some(0));
-
-    let color = ColorTracker::field_color(&field, 5);
-    assert_eq!(color, Some(5));
-
-    // Test wrapping
-    let color = ColorTracker::field_color(&field, 13);
-    assert_eq!(color, Some(1)); // 13 % 12 = 1
-}
-
-#[test]
-fn test_get_field_color_index_header() {
-    let packet = make_test_packet();
-    let packets = vec![packet];
-
-    // First field is a header (indent 0)
-    let header = &packets[0].fields[0];
-    let color = get_field_color_index(&packets, header);
-    assert_eq!(color, None);
-}
-
-#[test]
-fn test_get_field_color_index_regular_fields() {
-    let packet = make_test_packet();
-    let packets = vec![packet];
-
-    // Second field is regular (indent 1)
-    let field1 = &packets[0].fields[1];
-    let color = get_field_color_index(&packets, field1);
-    assert_eq!(color, Some(0));
-
-    // Third field is subfield (indent 2)
-    let field2 = &packets[0].fields[2];
-    let color = get_field_color_index(&packets, field2);
-    assert_eq!(color, Some(1));
-}
-
-#[test]
-fn test_get_field_color_index_not_found() {
-    let packet = make_test_packet();
-    let packets = vec![packet];
-
-    // Create a field that's not in the packet list
-    let other_field = Field::field("Other", "value", (100, 200));
-    let color = get_field_color_index(&packets, &other_field);
-    assert_eq!(color, None);
+fn test_truncate_chars() {
+    assert_eq!(truncate_chars("short", 10), "short");
+    assert_eq!(truncate_chars("exactly-ten", 11), "exactly-ten");
+    assert_eq!(truncate_chars("a much longer string", 10), "a much ...");
+    // Multi-byte characters must not panic or split
+    assert_eq!(truncate_chars("▾ Packet: Public Key", 10), "▾ Packe...");
+    assert_eq!(truncate_chars("héllo wörld exträ", 10), "héllo w...");
 }

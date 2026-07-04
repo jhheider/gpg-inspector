@@ -1,4 +1,4 @@
-use gpg_inspector_lib::{Field, Packet};
+use gpg_inspector_lib::Packet;
 use ratatui::style::Color;
 
 /// A 12-color palette with good contrast for terminal display.
@@ -85,36 +85,4 @@ impl ColorTracker {
     pub fn get_color(&self, index: usize) -> Option<u8> {
         self.byte_colors.get(index).copied().flatten()
     }
-
-    /// Returns the color for a field based on its position in the field list.
-    ///
-    /// Fields with indent == 0 (packet headers) get no color.
-    pub fn field_color(field: &Field, field_index: usize) -> Option<u8> {
-        if field.indent == 0 {
-            None
-        } else {
-            Some((field_index % 12) as u8)
-        }
-    }
-}
-
-/// Returns the color index for a field based on counting non-header fields before it.
-pub fn get_field_color_index(packets: &[Packet], target_field: &Field) -> Option<u8> {
-    let mut color_index: u8 = 0;
-
-    for packet in packets {
-        for field in &packet.fields {
-            if std::ptr::eq(field, target_field) {
-                return if field.indent > 0 {
-                    Some(color_index)
-                } else {
-                    None
-                };
-            }
-            if field.indent > 0 {
-                color_index = (color_index + 1) % 12;
-            }
-        }
-    }
-    None
 }

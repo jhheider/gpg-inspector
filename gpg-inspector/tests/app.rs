@@ -671,7 +671,7 @@ fn test_nested_fields_flattened_and_flagged() {
 }
 
 #[test]
-fn test_nested_fields_get_no_color_or_highlight() {
+fn test_nested_fields_highlight_in_their_own_stream() {
     let mut app = App::new();
     app.load_binary(TEST_COMPRESSED.to_vec(), "compressed");
 
@@ -689,15 +689,23 @@ fn test_nested_fields_get_no_color_or_highlight() {
         )
     };
 
-    assert_eq!(app.get_field_color(child_field_idx), None);
+    // The decompressed buffer is registered as a second stream
+    assert_eq!(app.streams.len(), 2);
+    assert_eq!(app.color_trackers.len(), 2);
 
+    // Selecting a nested field switches the displayed stream and
+    // highlights within it (colors restart per stream)
+    assert!(app.get_field_color(child_field_idx).is_some());
     app.selected_line = child_field_idx;
     app.update_highlight();
-    assert!(app.highlighted_bytes.is_none());
+    assert!(app.highlighted_bytes.is_some());
+    assert_eq!(app.display_stream(), 1);
+    let child_span = app.rows[child_field_idx].span;
+    assert!(child_span.1 <= app.display_bytes().len());
 
-    // A top-level non-header field still gets both
-    assert!(app.get_field_color(top_idx).is_some());
+    // A top-level field displays the raw stream
     app.selected_line = top_idx;
     app.update_highlight();
+    assert_eq!(app.display_stream(), 0);
     assert!(app.highlighted_bytes.is_some());
 }

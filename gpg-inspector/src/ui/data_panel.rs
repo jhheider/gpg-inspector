@@ -55,13 +55,12 @@ impl Widget for DataPanel<'_> {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let fields = self.app.get_all_fields();
-        if fields.is_empty() {
+        let total_lines = self.app.visible.len();
+        if total_lines == 0 {
             return;
         }
 
         let visible_lines = inner.height as usize;
-        let total_lines = fields.len();
 
         let start_line = self
             .app
@@ -69,23 +68,36 @@ impl Widget for DataPanel<'_> {
             .min(total_lines.saturating_sub(visible_lines));
         let end_line = (start_line + visible_lines).min(total_lines);
 
-        for (line_idx, field_idx) in (start_line..end_line).enumerate() {
+        for (line_idx, vis_pos) in (start_line..end_line).enumerate() {
             let y = inner.y + line_idx as u16;
             if y >= inner.y + inner.height {
                 break;
             }
 
-            let field = fields[field_idx];
-            let is_selected = field_idx == self.app.selected_line;
-            let indent = field.indent as usize;
+            let row_idx = self.app.visible[vis_pos];
+            let row = &self.app.rows[row_idx];
+            let is_selected = vis_pos == self.app.selected_line;
+            let is_match = matches.contains(&row_idx);
 
-            // Get the color for this field (None means header/white)
-            let color = match self.app.get_field_color(field_idx) {
+            // Nested (decompressed) packets indent two extra columns per level
+            let indent = row.indent as usize + row.depth as usize * 2;
+
+            let color = match row.color {
                 Some(idx) => get_color(idx),
                 None => Color::White, // Headers are white
             };
 
-            let is_match = matches.contains(&field_idx);
+            // Fold marker on foldable packet header rows
+            let name = if row.is_packet_first && self.app.packet_foldable(row.packet_id) {
+                let marker = if self.app.collapsed.contains(&row.packet_id) {
+                    "▸ "
+                } else {
+                    "▾ "
+                };
+                format!("{}{}", marker, row.name)
+            } else {
+                row.name.to_string()
+            };
 
             let mut name_style = if is_selected {
                 Style::default()
@@ -108,18 +120,10 @@ impl Widget for DataPanel<'_> {
             // Calculate widths with indentation
             let indent_str = " ".repeat(indent);
             let name_width = 28usize.saturating_sub(indent).min(inner.width as usize / 2);
-            let truncated_name: String = if field.name.len() > name_width {
-                format!("{}...", &field.name[..name_width.saturating_sub(3)])
-            } else {
-                field.name.to_string()
-            };
+            let truncated_name = truncate_chars(&name, name_width);
 
             let value_width = (inner.width as usize).saturating_sub(name_width + indent + 3);
-            let truncated_value: String = if field.value.len() > value_width {
-                format!("{}...", &field.value[..value_width.saturating_sub(3)])
-            } else {
-                field.value.to_string()
-            };
+            let truncated_value = truncate_chars(&row.value, value_width);
 
             let spans = vec![
                 Span::raw(&indent_str),
@@ -139,4 +143,16 @@ impl Widget for DataPanel<'_> {
 
 pub fn data_panel_visible_lines(area: Rect) -> usize {
     area.height.saturating_sub(2) as usize
+}
+
+/// Truncates to `width` characters with a `...` suffix, respecting
+/// UTF-8 char boundaries (names can contain fold markers, values can
+/// contain arbitrary text).
+pub fn truncate_chars(s: &str, width: usize) -> String {
+    if s.chars().count() > width {
+        let cut: String = s.chars().take(width.saturating_sub(3)).collect();
+        format!("{}...", cut)
+    } else {
+        s.to_string()
+    }
 }

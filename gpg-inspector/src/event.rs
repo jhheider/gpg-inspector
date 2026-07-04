@@ -156,16 +156,25 @@ fn handle_data_key(app: &mut App, key: KeyEvent, size: Rect) {
             app.scroll_hex_to_highlight(visible_lines);
         }
         KeyCode::End => {
-            let total = app.get_all_fields().len();
+            let total = app.visible.len();
             app.selected_line = total.saturating_sub(1);
             app.data_scroll = total.saturating_sub(visible_lines);
             app.update_highlight();
             app.scroll_hex_to_highlight(visible_lines);
         }
         KeyCode::Enter => {
-            if !app.get_all_fields().is_empty() {
+            if !app.visible.is_empty() {
                 app.show_detail = true;
             }
+        }
+        KeyCode::Char(' ') => {
+            app.toggle_fold(visible_lines);
+        }
+        KeyCode::Char('h') => {
+            app.set_fold(true, visible_lines);
+        }
+        KeyCode::Char('l') => {
+            app.set_fold(false, visible_lines);
         }
         KeyCode::Char('/') => {
             app.search_active = true;

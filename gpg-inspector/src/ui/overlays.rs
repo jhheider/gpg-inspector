@@ -100,8 +100,7 @@ impl<'a> DetailOverlay<'a> {
 #[cfg(not(tarpaulin_include))]
 impl Widget for DetailOverlay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let fields = self.app.get_all_fields();
-        let Some(field) = fields.get(self.app.selected_line) else {
+        let Some(field) = self.app.selected_row() else {
             return;
         };
 
