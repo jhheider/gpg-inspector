@@ -543,7 +543,7 @@ impl App {
 
         if self.selected_line < self.data_scroll {
             self.data_scroll = self.selected_line;
-        } else if self.selected_line >= self.data_scroll + visible_lines {
+        } else if visible_lines > 0 && self.selected_line >= self.data_scroll + visible_lines {
             self.data_scroll = self.selected_line.saturating_sub(visible_lines - 1);
         }
 

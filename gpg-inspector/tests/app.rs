@@ -868,3 +868,15 @@ fn test_jump_to_hex_owner_no_owner() {
     // No data at all
     assert!(!app.jump_to_hex_owner(20));
 }
+
+#[test]
+fn test_move_selection_zero_visible_lines() {
+    // A terminal too short for any data rows must not underflow
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    app.selected_line = 5;
+    app.move_selection(1, 0);
+    assert_eq!(app.selected_line, 6);
+}
