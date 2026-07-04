@@ -3,6 +3,6 @@
 workspace = true
 engine = "Llvm"
 all-features = true
-exclude-files = ["gpg-inspector/tests/*", "gpg-inspector-lib/tests/*"]
+exclude-files = ["crates/gpg-inspector/tests/*", "crates/gpg-inspector-lib/tests/*"]
 output-dir = "coverage"
 out = ["Lcov", "Html"]

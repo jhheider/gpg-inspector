@@ -573,7 +573,7 @@ mod tests {
         assert!(result.contains("Value: test"));
     }
 
-    const TEST_COMPRESSED: &[u8] = include_bytes!("../../fixtures/test.compressed.gpg");
+    const TEST_COMPRESSED: &[u8] = include_bytes!("../../../fixtures/test.compressed.gpg");
 
     #[test]
     fn test_output_txt_nested_packets() {

@@ -4,7 +4,7 @@ use ratatui::layout::Rect;
 use gpg_inspector::app::{App, PanelFocus};
 use gpg_inspector::event::handle_event;
 
-const TEST_KEY: &str = include_str!("../../fixtures/test.key");
+const TEST_KEY: &str = include_str!("../../../fixtures/test.key");
 
 fn key_event(code: KeyCode) -> Event {
     Event::Key(KeyEvent {
@@ -539,7 +539,7 @@ fn test_data_selection_updates_highlight() {
 
 // Binary mode event tests
 
-const TEST_KEY_BIN: &[u8] = include_bytes!("../../fixtures/test.key.gpg");
+const TEST_KEY_BIN: &[u8] = include_bytes!("../../../fixtures/test.key.gpg");
 
 #[test]
 fn test_binary_mode_editing_keys_noop() {

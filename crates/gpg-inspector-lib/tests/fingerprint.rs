@@ -3,7 +3,7 @@
 use gpg_inspector_lib::packet::fingerprint::{key_id, to_hex, v4_fingerprint, v6_fingerprint};
 use gpg_inspector_lib::{Field, parse, parse_bytes};
 
-const TEST_KEY: &str = include_str!("../../fixtures/test.key");
+const TEST_KEY: &str = include_str!("../../../fixtures/test.key");
 
 /// Verified independently with `gpg --show-keys --with-fingerprint`.
 const TEST_KEY_FINGERPRINT: &str = "EB483B26B078A4AA1B6F425EE21B6950A2ECB65C";

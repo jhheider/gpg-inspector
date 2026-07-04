@@ -6,7 +6,7 @@ mod packets;
 
 use gpg_inspector_lib::{ByteStream, decode_armor, parse, parse_bytes};
 
-const TEST_PUBLIC_KEY: &str = include_str!("../../fixtures/test.key");
+const TEST_PUBLIC_KEY: &str = include_str!("../../../fixtures/test.key");
 
 // ============================================================================
 // Armor Tests

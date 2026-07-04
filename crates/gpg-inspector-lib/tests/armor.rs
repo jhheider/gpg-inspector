@@ -69,8 +69,8 @@ YWJj
 
 use gpg_inspector_lib::{decode_armor_multi, looks_binary};
 
-const TEST_KEY: &str = include_str!("../../fixtures/test.key");
-const TEST_CLEARTEXT: &str = include_str!("../../fixtures/test.cleartext.asc");
+const TEST_KEY: &str = include_str!("../../../fixtures/test.key");
+const TEST_CLEARTEXT: &str = include_str!("../../../fixtures/test.cleartext.asc");
 
 #[test]
 fn test_multi_single_block_matches_decode_armor() {
