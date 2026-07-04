@@ -1,20 +1,37 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 
 use crate::app::{App, PanelFocus};
-use crate::ui::{data_panel, get_data_panel_area};
-use ratatui::layout::Rect;
+use crate::clipboard;
+use crate::ui::{data_panel, get_data_panel_area, get_hex_panel_area, get_input_panel_area};
+use ratatui::layout::{Position, Rect};
 
 pub fn handle_event(app: &mut App, event: Event, size: Rect) {
-    if let Event::Key(key) = event {
-        handle_key(app, key, size);
-    } else if let Event::Paste(text) = event
-        && app.focus == PanelFocus::Input
-    {
-        app.paste_text(&text);
+    match event {
+        Event::Key(key) => handle_key(app, key, size),
+        Event::Paste(text) => {
+            if app.focus == PanelFocus::Input {
+                app.paste_text(&text);
+            }
+        }
+        Event::Mouse(mouse) => handle_mouse(app, mouse, size),
+        _ => {}
     }
 }
 
+fn data_visible_lines(size: Rect) -> usize {
+    data_panel::data_panel_visible_lines(get_data_panel_area(size))
+}
+
+fn hex_visible_lines(size: Rect) -> usize {
+    get_hex_panel_area(size).height.saturating_sub(2) as usize
+}
+
 fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
+    // Status feedback (e.g. "Copied ...") lives until the next keypress
+    app.status_message = None;
+
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
             KeyCode::Char('c') | KeyCode::Char('q') => {
@@ -47,8 +64,13 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
     }
 
     if app.show_detail {
-        if matches!(key.code, KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc) {
-            app.show_detail = false;
+        match key.code {
+            KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc => {
+                app.show_detail = false;
+            }
+            KeyCode::Char('y') => yank_value(app),
+            KeyCode::Char('Y') => yank_bytes(app),
+            _ => {}
         }
         return;
     }
@@ -63,10 +85,7 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
             app.focus = app.focus.next();
         }
         KeyCode::BackTab => {
-            app.focus = match app.focus {
-                PanelFocus::Input => PanelFocus::Data,
-                PanelFocus::Data => PanelFocus::Input,
-            };
+            app.focus = app.focus.prev();
         }
         KeyCode::F(1) => {
             app.show_help = true;
@@ -74,14 +93,14 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
         // Esc intentionally does nothing; quit is Ctrl+C / Ctrl+Q
         _ => match app.focus {
             PanelFocus::Input => handle_input_key(app, key),
+            PanelFocus::Hex => handle_hex_key(app, key, size),
             PanelFocus::Data => handle_data_key(app, key, size),
         },
     }
 }
 
 fn handle_search_key(app: &mut App, key: KeyEvent, size: Rect) {
-    let data_area = get_data_panel_area(size);
-    let visible_lines = data_panel::data_panel_visible_lines(data_area);
+    let visible_lines = data_visible_lines(size);
 
     match key.code {
         KeyCode::Esc => {
@@ -132,9 +151,46 @@ fn handle_input_key(app: &mut App, key: KeyEvent) {
     }
 }
 
+fn handle_hex_key(app: &mut App, key: KeyEvent, size: Rect) {
+    let visible_lines = hex_visible_lines(size);
+
+    match key.code {
+        KeyCode::Left | KeyCode::Char('h') => {
+            app.move_hex_cursor(-1, visible_lines);
+        }
+        KeyCode::Right | KeyCode::Char('l') => {
+            app.move_hex_cursor(1, visible_lines);
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.move_hex_cursor(-16, visible_lines);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.move_hex_cursor(16, visible_lines);
+        }
+        KeyCode::PageUp => {
+            app.move_hex_cursor(-(16 * visible_lines as isize), visible_lines);
+        }
+        KeyCode::PageDown => {
+            app.move_hex_cursor(16 * visible_lines as isize, visible_lines);
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.set_hex_cursor(0, visible_lines);
+        }
+        KeyCode::End | KeyCode::Char('G') => {
+            app.set_hex_cursor(usize::MAX, visible_lines);
+        }
+        KeyCode::Enter | KeyCode::Char('f') => {
+            app.jump_to_hex_owner(data_visible_lines(size));
+        }
+        KeyCode::Char('?') => {
+            app.show_help = true;
+        }
+        _ => {}
+    }
+}
+
 fn handle_data_key(app: &mut App, key: KeyEvent, size: Rect) {
-    let data_area = get_data_panel_area(size);
-    let visible_lines = data_panel::data_panel_visible_lines(data_area);
+    let visible_lines = data_visible_lines(size);
 
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
@@ -156,16 +212,25 @@ fn handle_data_key(app: &mut App, key: KeyEvent, size: Rect) {
             app.scroll_hex_to_highlight(visible_lines);
         }
         KeyCode::End => {
-            let total = app.get_all_fields().len();
+            let total = app.visible.len();
             app.selected_line = total.saturating_sub(1);
             app.data_scroll = total.saturating_sub(visible_lines);
             app.update_highlight();
             app.scroll_hex_to_highlight(visible_lines);
         }
         KeyCode::Enter => {
-            if !app.get_all_fields().is_empty() {
+            if !app.visible.is_empty() {
                 app.show_detail = true;
             }
+        }
+        KeyCode::Char(' ') => {
+            app.toggle_fold(visible_lines);
+        }
+        KeyCode::Char('h') => {
+            app.set_fold(true, visible_lines);
+        }
+        KeyCode::Char('l') => {
+            app.set_fold(false, visible_lines);
         }
         KeyCode::Char('/') => {
             app.search_active = true;
@@ -177,8 +242,96 @@ fn handle_data_key(app: &mut App, key: KeyEvent, size: Rect) {
         KeyCode::Char('N') => {
             app.jump_to_match(false, visible_lines);
         }
+        KeyCode::Char('y') => yank_value(app),
+        KeyCode::Char('Y') => yank_bytes(app),
         KeyCode::Char('?') => {
             app.show_help = true;
+        }
+        _ => {}
+    }
+}
+
+/// Copies the selected row's value to the clipboard (OSC 52).
+fn yank_value(app: &mut App) {
+    let Some(row) = app.selected_row() else {
+        return;
+    };
+    let payload = row.value.as_bytes().to_vec();
+    let desc = format!("{} chars", row.value.chars().count());
+    yank(app, payload, desc);
+}
+
+/// Copies the selected row's raw bytes, hex-encoded, to the clipboard.
+fn yank_bytes(app: &mut App) {
+    let Some(row) = app.selected_row() else {
+        return;
+    };
+    let (start, end) = row.span;
+    let Some(stream) = app.streams.get(row.stream) else {
+        return;
+    };
+    if end <= start || end > stream.len() {
+        return;
+    }
+    let hex: String = stream[start..end]
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect();
+    let desc = format!("{} bytes as hex", end - start);
+    yank(app, hex.into_bytes(), desc);
+}
+
+fn yank(app: &mut App, mut payload: Vec<u8>, desc: String) {
+    let truncated = payload.len() > clipboard::MAX_COPY_BYTES;
+    if truncated {
+        payload.truncate(clipboard::MAX_COPY_BYTES);
+    }
+    let _ = clipboard::copy(&payload);
+    app.status_message = Some(if truncated {
+        format!("Copied {} (truncated to 64 KB)", desc)
+    } else {
+        format!("Copied {}", desc)
+    });
+}
+
+fn handle_mouse(app: &mut App, mouse: MouseEvent, size: Rect) {
+    let pos = Position::new(mouse.column, mouse.row);
+    let input_area = get_input_panel_area(size);
+    let hex_area = get_hex_panel_area(size);
+    let data_area = get_data_panel_area(size);
+
+    match mouse.kind {
+        MouseEventKind::ScrollUp => {
+            if data_area.contains(pos) {
+                app.move_selection(-3, data_panel::data_panel_visible_lines(data_area));
+            } else if hex_area.contains(pos) {
+                app.scroll_hex(-3);
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if data_area.contains(pos) {
+                app.move_selection(3, data_panel::data_panel_visible_lines(data_area));
+            } else if hex_area.contains(pos) {
+                app.scroll_hex(3);
+            }
+        }
+        MouseEventKind::Down(MouseButton::Left) => {
+            if input_area.contains(pos) {
+                app.focus = PanelFocus::Input;
+            } else if hex_area.contains(pos) {
+                app.focus = PanelFocus::Hex;
+                // Rows inside the border start one line down
+                let rel_row = mouse.row.saturating_sub(hex_area.y + 1) as usize;
+                let offset = (app.hex_scroll + rel_row) * 16;
+                app.set_hex_cursor(offset, hex_area.height.saturating_sub(2) as usize);
+            } else if data_area.contains(pos) {
+                app.focus = PanelFocus::Data;
+                let rel_row = mouse.row.saturating_sub(data_area.y + 1) as usize;
+                let line = app.data_scroll + rel_row;
+                if line < app.visible.len() {
+                    app.select_line(line, data_panel::data_panel_visible_lines(data_area));
+                }
+            }
         }
         _ => {}
     }

@@ -1,13 +1,12 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Widget},
 };
 
-use crate::app::App;
-use crate::ui::colors::get_color;
+use crate::app::{App, PanelFocus};
 
 pub struct HexPanel<'a> {
     app: &'a App,
@@ -25,22 +24,41 @@ impl<'a> HexPanel<'a> {
 #[cfg(not(tarpaulin_include))]
 impl Widget for HexPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Hex panel is display-only, not focusable
+        // Hex panel is display-only, not focusable. It shows the byte
+        // stream the selected row lives in (raw input, or a
+        // decompressed buffer for nested packets).
+        let title = if self.app.display_stream() > 0 {
+            let depth = self.app.selected_row().map(|r| r.depth).unwrap_or(1);
+            format!(" Hex View — decompressed (depth {}) ", depth)
+        } else {
+            " Hex View ".to_string()
+        };
+        let theme = &self.app.theme;
+        let focused = self.app.focus == PanelFocus::Hex;
+        let border_color = if focused {
+            theme.border_focused
+        } else {
+            theme.border
+        };
         let block = Block::default()
-            .title(" Hex View ")
+            .title(title)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(border_color));
 
         let inner = block.inner(area);
         block.render(area, buf);
 
-        if self.app.raw_bytes.is_empty() {
+        let bytes = std::sync::Arc::clone(self.app.display_bytes());
+        if bytes.is_empty() {
             return;
         }
 
         let bytes_per_line = 16;
         let visible_lines = inner.height as usize;
-        let total_lines = self.app.raw_bytes.len().div_ceil(bytes_per_line);
+        let total_lines = bytes.len().div_ceil(bytes_per_line);
+
+        // Offset column grows with the buffer (4 hex digits minimum)
+        let offset_width = ((bytes.len().max(1).ilog2() / 4) as usize + 1).max(4);
 
         let start_line = self
             .app
@@ -55,17 +73,17 @@ impl Widget for HexPanel<'_> {
             }
 
             let start_byte = line_num * bytes_per_line;
-            let end_byte = (start_byte + bytes_per_line).min(self.app.raw_bytes.len());
+            let end_byte = (start_byte + bytes_per_line).min(bytes.len());
 
             let mut spans = Vec::new();
 
             spans.push(Span::styled(
-                format!("{:04X}  ", start_byte),
-                Style::default().fg(Color::DarkGray),
+                format!("{:0width$X}  ", start_byte, width = offset_width),
+                Style::default().fg(theme.dim),
             ));
 
             for i in start_byte..end_byte {
-                let byte = self.app.raw_bytes[i];
+                let byte = bytes[i];
 
                 let is_highlighted = self
                     .app
@@ -76,12 +94,17 @@ impl Widget for HexPanel<'_> {
                 let base_color = self
                     .app
                     .get_byte_color(i)
-                    .map(get_color)
-                    .unwrap_or(Color::White);
+                    .map(|c| theme.color(c))
+                    .unwrap_or(theme.text);
 
-                let style = if is_highlighted {
+                let style = if focused && i == self.app.hex_cursor {
                     Style::default()
-                        .fg(Color::Black)
+                        .fg(theme.selection_fg)
+                        .bg(theme.border_focused)
+                        .add_modifier(Modifier::BOLD)
+                } else if is_highlighted {
+                    Style::default()
+                        .fg(theme.selection_fg)
                         .bg(base_color)
                         .add_modifier(Modifier::BOLD)
                 } else {
@@ -102,7 +125,7 @@ impl Widget for HexPanel<'_> {
             spans.push(Span::raw("  "));
 
             for i in start_byte..end_byte {
-                let byte = self.app.raw_bytes[i];
+                let byte = bytes[i];
                 let ch = if byte.is_ascii_graphic() || byte == b' ' {
                     byte as char
                 } else {
@@ -118,12 +141,17 @@ impl Widget for HexPanel<'_> {
                 let base_color = self
                     .app
                     .get_byte_color(i)
-                    .map(get_color)
-                    .unwrap_or(Color::DarkGray);
+                    .map(|c| theme.color(c))
+                    .unwrap_or(theme.dim);
 
-                let style = if is_highlighted {
+                let style = if focused && i == self.app.hex_cursor {
                     Style::default()
-                        .fg(Color::Black)
+                        .fg(theme.selection_fg)
+                        .bg(theme.border_focused)
+                        .add_modifier(Modifier::BOLD)
+                } else if is_highlighted {
+                    Style::default()
+                        .fg(theme.selection_fg)
                         .bg(base_color)
                         .add_modifier(Modifier::BOLD)
                 } else {

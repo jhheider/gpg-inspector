@@ -18,7 +18,11 @@ Inspired by [ConradIrwin/gpg-decoder](https://github.com/ConradIrwin/gpg-decoder
 - Compressed Data packets are decompressed (ZIP/ZLIB/BZip2) and their nested packets parsed
 - Multiple armor blocks in one input, and cleartext signed messages
 - Color-coded byte visualization linking fields to raw bytes
-- Field search (`/`) and full-value detail view (`Enter`)
+- Field search (`/`), full-value detail view (`Enter`), and collapsible packets (`Space`)
+- Focusable hex panel with byte cursor and reverse lookup (jump to the field owning a byte)
+- Copy field values or raw bytes to the clipboard via OSC 52 (`y` / `Y`)
+- Mouse support: click to focus/select, wheel to scroll
+- Dark and light themes (`--theme auto|dark|light`, auto-detected from `COLORFGBG`)
 - Old and new OpenPGP packet formats, packet versions v3 through v6 (RFC 4880 and RFC 9580)
 - Scriptable text and JSON output modes (`--txt`, `--json`)
 - CRC24 checksum validation for armored input
@@ -82,6 +86,7 @@ gpg-inspector -f key.asc --txt
 | `-f`, `--file FILE` | Load GPG data from a file |
 | `--txt` | Print parsed packets as formatted text (with hex dump) and exit |
 | `--json` | Print parsed packets as JSON and exit |
+| `--theme THEME` | TUI color theme: `auto` (default), `dark`, or `light` |
 | `--version` | Show version |
 | `--help` | Show help |
 
@@ -95,9 +100,10 @@ gpg-inspector -f key.asc --txt
 
 | Key | Action |
 |-----|--------|
-| `Tab` / `Shift+Tab` | Switch between Input and Data panels |
+| `Tab` / `Shift+Tab` | Cycle focus: Input, Hex, Data |
 | `F1` | Toggle help overlay |
 | `Ctrl+C` / `Ctrl+Q` | Quit |
+| Mouse | Click to focus/select, wheel to scroll (Shift+drag for native selection) |
 
 ### Input Panel
 
@@ -121,11 +127,22 @@ gpg-inspector -f key.asc --txt
 | `Page Up` / `Page Down` | Move selection by page |
 | `Home` / `End` | Jump to first/last field |
 | `Enter` | Show full details for the selected field |
-| `/` | Search fields by name or value (`Enter` jumps, `Esc` cancels) |
+| `Space` | Fold / unfold the selected packet (`h` collapse, `l` expand) |
+| `/` | Search fields by name or value (`Enter` jumps, `Esc` cancels; jumps auto-expand folds) |
 | `n` / `N` | Jump to next / previous search match |
+| `y` / `Y` | Copy field value / raw bytes as hex to the clipboard (OSC 52) |
 | `?` | Toggle help overlay |
 
-Selecting a field in the Data panel highlights the corresponding bytes in the hex view.
+### Hex Panel
+
+| Key | Action |
+|-----|--------|
+| `h`/`l`/`j`/`k` or arrows | Move the byte cursor (left/right/line down/up) |
+| `Page Up` / `Page Down` | Move by page |
+| `g` / `G`, `Home` / `End` | Jump to first / last byte |
+| `Enter` or `f` | Select the field owning the byte under the cursor |
+
+Selecting a field in the Data panel highlights the corresponding bytes in the hex view. For nested (decompressed) packets, the hex view switches to the decompressed buffer.
 
 ## Supported Packet Types
 

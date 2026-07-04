@@ -1,13 +1,34 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use gpg_inspector_lib::{ArmorBlock, Field, Packet};
+use gpg_inspector_lib::{ArmorBlock, Packet};
 
-use crate::ui::colors::ColorTracker;
+use crate::ui::colors::{ColorTracker, Theme};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelFocus {
     Input,
+    Hex,
     Data,
+}
+
+impl PanelFocus {
+    /// Tab order matches the visual layout: input, hex, data.
+    pub fn next(self) -> Self {
+        match self {
+            PanelFocus::Input => PanelFocus::Hex,
+            PanelFocus::Hex => PanelFocus::Data,
+            PanelFocus::Data => PanelFocus::Input,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            PanelFocus::Input => PanelFocus::Data,
+            PanelFocus::Hex => PanelFocus::Input,
+            PanelFocus::Data => PanelFocus::Hex,
+        }
+    }
 }
 
 /// Where the current data came from. Binary input is read-only: the
@@ -18,13 +39,28 @@ pub enum InputSource {
     Binary { origin: String, len: usize },
 }
 
-impl PanelFocus {
-    pub fn next(self) -> Self {
-        match self {
-            PanelFocus::Input => PanelFocus::Data,
-            PanelFocus::Data => PanelFocus::Input,
-        }
-    }
+/// One display row in the data panel: a flattened view of a packet
+/// field (or a synthesized marker), carrying everything the UI needs.
+#[derive(Debug, Clone)]
+pub struct Row {
+    pub name: Arc<str>,
+    pub value: Arc<str>,
+    /// Byte range within `streams[self.stream]`.
+    pub span: (usize, usize),
+    /// Field indent level (0 = packet header).
+    pub indent: u8,
+    /// Compression nesting depth (0 = top level).
+    pub depth: u8,
+    /// Which byte stream the span indexes (0 = raw input bytes; one
+    /// extra stream per decompressed buffer).
+    pub stream: usize,
+    /// DFS-order id of the packet (or marker) this row belongs to.
+    pub packet_id: usize,
+    /// True for the first row of its packet — the fold anchor that
+    /// stays visible when the packet is collapsed.
+    pub is_packet_first: bool,
+    /// Palette color index; None for header/marker rows.
+    pub color: Option<u8>,
 }
 
 pub struct App {
@@ -35,10 +71,29 @@ pub struct App {
     pub raw_bytes: Arc<[u8]>,
     pub armor_blocks: Vec<ArmorBlock>,
     pub cleartext: Option<Arc<str>>,
-    pub color_tracker: ColorTracker,
+    /// All byte streams: `[0]` is the raw input, followed by one per
+    /// decompressed buffer in DFS order.
+    pub streams: Vec<Arc<[u8]>>,
+    /// Per-stream byte color assignments, parallel to `streams`.
+    pub color_trackers: Vec<ColorTracker>,
+    /// All display rows, in DFS order.
+    pub rows: Vec<Row>,
+    /// packet_id -> parent packet_id (None for top level).
+    pub packet_parent: Vec<Option<usize>>,
+    /// packet_ids currently folded.
+    pub collapsed: HashSet<usize>,
+    /// Indices into `rows` currently visible (fold-aware).
+    pub visible: Vec<usize>,
     pub focus: PanelFocus,
     pub hex_scroll: usize,
+    /// Byte offset of the hex panel cursor (when the hex panel is
+    /// focused), within the displayed stream.
+    pub hex_cursor: usize,
+    /// One-shot feedback line (e.g. clipboard confirmation), shown in
+    /// the data panel title and cleared on the next keypress.
+    pub status_message: Option<String>,
     pub data_scroll: usize,
+    /// Index into `visible` of the selected row.
     pub selected_line: usize,
     pub highlighted_bytes: Option<(usize, usize)>,
     pub error_message: Option<String>,
@@ -47,6 +102,7 @@ pub struct App {
     pub show_detail: bool,
     pub search_active: bool,
     pub search_query: String,
+    pub theme: Theme,
 }
 
 impl App {
@@ -59,9 +115,16 @@ impl App {
             raw_bytes: Arc::from([]),
             armor_blocks: Vec::new(),
             cleartext: None,
-            color_tracker: ColorTracker::default(),
+            streams: vec![Arc::from([])],
+            color_trackers: vec![ColorTracker::default()],
+            rows: Vec::new(),
+            packet_parent: Vec::new(),
+            collapsed: HashSet::new(),
+            visible: Vec::new(),
             focus: PanelFocus::Input,
             hex_scroll: 0,
+            hex_cursor: 0,
+            status_message: None,
             data_scroll: 0,
             selected_line: 0,
             highlighted_bytes: None,
@@ -71,6 +134,7 @@ impl App {
             show_detail: false,
             search_active: false,
             search_query: String::new(),
+            theme: Theme::default(),
         }
     }
 
@@ -93,18 +157,15 @@ impl App {
 
         match gpg_inspector_lib::parse_bytes(bytes) {
             Ok(packets) => {
-                self.color_tracker =
-                    ColorTracker::compute_from_packets(&packets, self.raw_bytes.len());
                 self.packets = packets;
                 self.error_message = None;
             }
             Err(e) => {
                 self.packets.clear();
-                self.color_tracker = ColorTracker::default();
                 self.error_message = Some(format!("Parse error: {}", e));
             }
         }
-        self.clamp_selection();
+        self.rebuild_rows();
         self.focus = PanelFocus::Data;
     }
 
@@ -119,9 +180,8 @@ impl App {
             self.raw_bytes = Arc::from([]);
             self.armor_blocks = Vec::new();
             self.cleartext = None;
-            self.color_tracker = ColorTracker::default();
             self.error_message = None;
-            self.clamp_selection();
+            self.rebuild_rows();
             return;
         }
 
@@ -132,15 +192,11 @@ impl App {
                 self.cleartext = armor_result.cleartext;
                 match gpg_inspector_lib::parse_bytes(armor_result.bytes) {
                     Ok(packets) => {
-                        // Compute colors from field spans
-                        self.color_tracker =
-                            ColorTracker::compute_from_packets(&packets, self.raw_bytes.len());
                         self.packets = packets;
                         self.error_message = None;
                     }
                     Err(e) => {
                         self.packets.clear();
-                        self.color_tracker = ColorTracker::default();
                         self.error_message = Some(format!("Parse error: {}", e));
                     }
                 }
@@ -150,104 +206,316 @@ impl App {
                 self.raw_bytes = Arc::from([]);
                 self.armor_blocks = Vec::new();
                 self.cleartext = None;
-                self.color_tracker = ColorTracker::default();
                 self.error_message = Some(format!("Armor error: {}", e));
             }
         }
+        self.rebuild_rows();
+    }
+
+    /// Rebuilds `rows`, `streams`, `color_trackers`, `packet_parent`,
+    /// and `visible` from `packets`. Fold state resets: packet ids are
+    /// positional and do not survive a reparse.
+    pub fn rebuild_rows(&mut self) {
+        self.streams = vec![Arc::clone(&self.raw_bytes)];
+        self.rows.clear();
+        self.packet_parent.clear();
+        self.collapsed.clear();
+
+        let mut counters: Vec<u8> = vec![0];
+        let mut next_id = 0usize;
+
+        if let Some(ref cleartext) = self.cleartext {
+            let first_line = cleartext.lines().next().unwrap_or("");
+            let id = next_id;
+            next_id += 1;
+            self.packet_parent.push(None);
+            self.rows.push(Row {
+                name: "Cleartext".into(),
+                value: format!("{} ({} chars)", first_line, cleartext.len()).into(),
+                span: (0, 0),
+                indent: 0,
+                depth: 0,
+                stream: 0,
+                packet_id: id,
+                is_packet_first: true,
+                color: None,
+            });
+        }
+
+        // Interleave armor-block markers when the input has several
+        let mut block_iter = if self.armor_blocks.len() > 1 {
+            self.armor_blocks.as_slice()
+        } else {
+            &[]
+        }
+        .iter()
+        .peekable();
+
+        let packets = std::mem::take(&mut self.packets);
+        for packet in &packets {
+            while let Some(block) = block_iter.peek() {
+                if block.range.0 <= packet.start {
+                    let block = block_iter.next().unwrap();
+                    let id = next_id;
+                    next_id += 1;
+                    self.packet_parent.push(None);
+                    self.rows.push(Row {
+                        name: format!("Armor Block: {}", block.armor_type).into(),
+                        value: format!("{} bytes", block.range.1 - block.range.0).into(),
+                        span: block.range,
+                        indent: 0,
+                        depth: 0,
+                        stream: 0,
+                        packet_id: id,
+                        is_packet_first: true,
+                        color: None,
+                    });
+                } else {
+                    break;
+                }
+            }
+            walk_packets(
+                std::slice::from_ref(packet),
+                0,
+                0,
+                None,
+                &mut next_id,
+                &mut self.streams,
+                &mut counters,
+                &mut self.rows,
+                &mut self.packet_parent,
+            );
+        }
+        self.packets = packets;
+
+        self.rebuild_trackers();
+        self.rebuild_visible();
+    }
+
+    fn rebuild_trackers(&mut self) {
+        self.color_trackers = self
+            .streams
+            .iter()
+            .map(|s| ColorTracker::new(s.len()))
+            .collect();
+        for row in &self.rows {
+            if let Some(color) = row.color {
+                let (start, end) = row.span;
+                let colors = &mut self.color_trackers[row.stream].byte_colors;
+                if end > start && end <= colors.len() {
+                    for slot in &mut colors[start..end] {
+                        *slot = Some(color);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Recomputes which rows are visible under the current fold state.
+    pub fn rebuild_visible(&mut self) {
+        self.visible = (0..self.rows.len())
+            .filter(|&i| !self.row_hidden(i))
+            .collect();
         self.clamp_selection();
     }
 
-    /// Keeps selection and scroll positions valid when the field count changes.
+    fn row_hidden(&self, row_idx: usize) -> bool {
+        let row = &self.rows[row_idx];
+        if self.collapsed.contains(&row.packet_id) && !row.is_packet_first {
+            return true;
+        }
+        let mut parent = self.packet_parent.get(row.packet_id).copied().flatten();
+        while let Some(pid) = parent {
+            if self.collapsed.contains(&pid) {
+                return true;
+            }
+            parent = self.packet_parent.get(pid).copied().flatten();
+        }
+        false
+    }
+
+    /// Keeps selection and scroll positions valid when the visible row
+    /// set changes.
     fn clamp_selection(&mut self) {
-        let total = self.get_all_fields().len();
-        self.selected_line = self.selected_line.min(total.saturating_sub(1));
+        self.selected_line = self.selected_line.min(self.visible.len().saturating_sub(1));
         self.data_scroll = self.data_scroll.min(self.selected_line);
-        let hex_lines = self.raw_bytes.len().div_ceil(16);
+        let display_len = self.display_bytes().len();
+        let hex_lines = display_len.div_ceil(16);
         self.hex_scroll = self.hex_scroll.min(hex_lines.saturating_sub(1));
+        self.hex_cursor = self.hex_cursor.min(display_len.saturating_sub(1));
         self.update_highlight();
     }
 
-    pub fn get_all_fields(&self) -> Vec<&Field> {
-        self.get_all_fields_flagged()
-            .into_iter()
-            .map(|(field, _)| field)
-            .collect()
+    /// All rows, fold-agnostic (packet fields plus synthesized markers).
+    pub fn get_all_fields(&self) -> &[Row] {
+        &self.rows
     }
 
-    /// Flattens all packets' fields, including nested (decompressed)
-    /// packets' fields, flagging the nested ones. Nested fields' spans
-    /// index their packet's decompressed buffer, not `raw_bytes`, so
-    /// they are excluded from hex highlighting and coloring until the
-    /// hex view can switch buffers.
-    pub fn get_all_fields_flagged(&self) -> Vec<(&Field, bool)> {
-        fn walk<'a>(packets: &'a [Packet], is_child: bool, out: &mut Vec<(&'a Field, bool)>) {
-            for packet in packets {
-                for field in &packet.fields {
-                    out.push((field, is_child));
-                }
-                walk(&packet.children, true, out);
-            }
-        }
-
-        let mut fields = Vec::new();
-        walk(&self.packets, false, &mut fields);
-        fields
+    /// All rows flagged with whether they come from a nested
+    /// (decompressed) packet.
+    pub fn get_all_fields_flagged(&self) -> Vec<(&Row, bool)> {
+        self.rows.iter().map(|r| (r, r.depth > 0)).collect()
     }
 
-    pub fn get_field_span(&self, field: &Field) -> (usize, usize) {
-        field.span
+    /// Palette color for a row by index into `rows`.
+    pub fn get_field_color(&self, row_index: usize) -> Option<u8> {
+        self.rows.get(row_index).and_then(|r| r.color)
     }
 
-    /// Returns the color index for a field based on its position.
-    /// Fields with indent == 0 (packet headers) get no color, and
-    /// neither do nested (decompressed) fields — their bytes are not in
-    /// `raw_bytes`, so coloring them would desynchronize from the hex view.
-    pub fn get_field_color(&self, field_index: usize) -> Option<u8> {
-        let fields = self.get_all_fields_flagged();
-        if field_index >= fields.len() {
-            return None;
-        }
-
-        let (field, is_child) = fields[field_index];
-        if field.indent == 0 || is_child {
-            return None;
-        }
-
-        // Count top-level non-header fields before this one; must match
-        // ColorTracker::compute_from_packets, which only sees top-level
-        // packets' fields.
-        let mut color_index: u8 = 0;
-        for (i, &(f, child)) in fields.iter().enumerate() {
-            if i == field_index {
-                return Some(color_index);
-            }
-            if !child && f.indent > 0 {
-                color_index = (color_index + 1) % 12;
-            }
-        }
-        unreachable!(
-            "field_index {} is within bounds but not found in iteration",
-            field_index
-        )
+    /// A row's byte span within its stream.
+    pub fn get_field_span(&self, row: &Row) -> (usize, usize) {
+        row.span
     }
 
+    /// The currently selected row, if any.
+    pub fn selected_row(&self) -> Option<&Row> {
+        self.visible.get(self.selected_line).map(|&i| &self.rows[i])
+    }
+
+    /// The row shown at a visible line position.
+    pub fn row_at(&self, visible_line: usize) -> Option<&Row> {
+        self.visible.get(visible_line).map(|&i| &self.rows[i])
+    }
+
+    /// The stream the hex panel should display: the selected row's.
+    pub fn display_stream(&self) -> usize {
+        self.selected_row().map(|r| r.stream).unwrap_or(0)
+    }
+
+    /// The bytes the hex panel should display.
+    pub fn display_bytes(&self) -> &Arc<[u8]> {
+        self.streams
+            .get(self.display_stream())
+            .unwrap_or(&self.raw_bytes)
+    }
+
+    /// Byte color within the displayed stream.
     pub fn get_byte_color(&self, byte_index: usize) -> Option<u8> {
-        self.color_tracker.get_color(byte_index)
+        self.color_trackers
+            .get(self.display_stream())
+            .and_then(|t| t.get_color(byte_index))
+    }
+
+    /// True if the packet has anything to fold (more rows than its
+    /// header, or nested packets).
+    pub fn packet_foldable(&self, packet_id: usize) -> bool {
+        self.rows
+            .iter()
+            .filter(|r| r.packet_id == packet_id)
+            .count()
+            > 1
+            || self.packet_parent.contains(&Some(packet_id))
+    }
+
+    /// Collapses or expands the selected row's packet. Selection moves
+    /// to the packet's header row.
+    pub fn set_fold(&mut self, collapse: bool, visible_lines: usize) {
+        let Some(row) = self.selected_row() else {
+            return;
+        };
+        let packet_id = row.packet_id;
+        if !self.packet_foldable(packet_id) {
+            return;
+        }
+        if collapse {
+            self.collapsed.insert(packet_id);
+        } else {
+            self.collapsed.remove(&packet_id);
+        }
+        self.rebuild_visible();
+
+        if let Some(first_row) = self.rows.iter().position(|r| r.packet_id == packet_id)
+            && let Some(pos) = self.visible.iter().position(|&i| i == first_row)
+        {
+            self.select_line(pos, visible_lines);
+        }
+    }
+
+    /// Toggles the fold state of the selected row's packet.
+    pub fn toggle_fold(&mut self, visible_lines: usize) {
+        if let Some(row) = self.selected_row() {
+            let collapse = !self.collapsed.contains(&row.packet_id);
+            self.set_fold(collapse, visible_lines);
+        }
     }
 
     pub fn update_highlight(&mut self) {
-        let fields = self.get_all_fields_flagged();
-        if self.selected_line < fields.len() {
-            let (field, is_child) = fields[self.selected_line];
-            // Nested fields' spans index the decompressed buffer, not
-            // raw_bytes; highlighting them would mark the wrong bytes
-            self.highlighted_bytes = if is_child {
-                None
-            } else {
-                Some(self.get_field_span(field))
-            };
+        self.highlighted_bytes = self.selected_row().map(|r| r.span);
+    }
+
+    /// Moves the hex cursor by `delta` bytes within the displayed
+    /// stream; the hex scroll follows the cursor.
+    pub fn move_hex_cursor(&mut self, delta: isize, visible_lines: usize) {
+        let target = if delta >= 0 {
+            self.hex_cursor.saturating_add(delta as usize)
         } else {
-            self.highlighted_bytes = None;
+            self.hex_cursor.saturating_sub((-delta) as usize)
+        };
+        self.set_hex_cursor(target, visible_lines);
+    }
+
+    /// Places the hex cursor at a byte offset (clamped) and scrolls it
+    /// into view.
+    pub fn set_hex_cursor(&mut self, offset: usize, visible_lines: usize) {
+        let len = self.display_bytes().len();
+        if len == 0 {
+            return;
+        }
+        self.hex_cursor = offset.min(len - 1);
+        let line = self.hex_cursor / 16;
+        if line < self.hex_scroll {
+            self.hex_scroll = line;
+        } else if visible_lines > 0 && line >= self.hex_scroll + visible_lines {
+            self.hex_scroll = line + 1 - visible_lines;
+        }
+    }
+
+    /// Scrolls the hex view without moving the cursor (mouse wheel).
+    pub fn scroll_hex(&mut self, delta: isize) {
+        let total_lines = self.display_bytes().len().div_ceil(16);
+        let target = if delta >= 0 {
+            self.hex_scroll.saturating_add(delta as usize)
+        } else {
+            self.hex_scroll.saturating_sub((-delta) as usize)
+        };
+        self.hex_scroll = target.min(total_lines.saturating_sub(1));
+    }
+
+    /// Jumps the data selection to the row owning the byte under the
+    /// hex cursor: the narrowest containing span in the displayed
+    /// stream, preferring deeper-indented rows on ties. Focus moves to
+    /// the data panel on success.
+    pub fn jump_to_hex_owner(&mut self, data_visible_lines: usize) -> bool {
+        let stream = self.display_stream();
+        let pos = self.hex_cursor;
+
+        let mut best: Option<(usize, usize, u8)> = None; // (row_idx, size, indent)
+        for (i, row) in self.rows.iter().enumerate() {
+            if row.stream != stream {
+                continue;
+            }
+            let (start, end) = row.span;
+            if pos < start || pos >= end {
+                continue;
+            }
+            let size = end - start;
+            let better = match best {
+                None => true,
+                Some((_, best_size, best_indent)) => {
+                    size < best_size || (size == best_size && row.indent > best_indent)
+                }
+            };
+            if better {
+                best = Some((i, size, row.indent));
+            }
+        }
+
+        if let Some((row_idx, _, _)) = best {
+            self.select_row_index(row_idx, data_visible_lines);
+            self.focus = PanelFocus::Data;
+            true
+        } else {
+            false
         }
     }
 
@@ -265,8 +533,7 @@ impl App {
     }
 
     pub fn move_selection(&mut self, delta: isize, visible_lines: usize) {
-        let fields = self.get_all_fields();
-        let max_line = fields.len().saturating_sub(1);
+        let max_line = self.visible.len().saturating_sub(1);
 
         if delta > 0 {
             self.selected_line = (self.selected_line + delta as usize).min(max_line);
@@ -284,9 +551,9 @@ impl App {
         self.scroll_hex_to_highlight(visible_lines);
     }
 
-    /// Moves the selection to a specific field and scrolls it into view.
+    /// Moves the selection to a visible line and scrolls it into view.
     pub fn select_line(&mut self, line: usize, visible_lines: usize) {
-        let total = self.get_all_fields().len();
+        let total = self.visible.len();
         if total == 0 {
             return;
         }
@@ -302,32 +569,60 @@ impl App {
         self.scroll_hex_to_highlight(visible_lines);
     }
 
-    /// Indices of fields whose name or value contains the search query
-    /// (case-insensitive). Empty query matches nothing.
+    /// Expands any folds hiding a row, then selects it.
+    pub fn select_row_index(&mut self, row_idx: usize, visible_lines: usize) {
+        if row_idx >= self.rows.len() {
+            return;
+        }
+        let mut changed = false;
+        let mut pid = Some(self.rows[row_idx].packet_id);
+        while let Some(id) = pid {
+            if self.collapsed.remove(&id) {
+                changed = true;
+            }
+            pid = self.packet_parent.get(id).copied().flatten();
+        }
+        if changed {
+            self.rebuild_visible();
+        }
+        if let Some(pos) = self.visible.iter().position(|&i| i == row_idx) {
+            self.select_line(pos, visible_lines);
+        }
+    }
+
+    /// Indices (into `rows`) of rows whose name or value contains the
+    /// search query (case-insensitive). Searches hidden rows too; a
+    /// jump auto-expands. Empty query matches nothing.
     pub fn search_matches(&self) -> Vec<usize> {
         if self.search_query.is_empty() {
             return Vec::new();
         }
         let query = self.search_query.to_lowercase();
-        self.get_all_fields()
+        self.rows
             .iter()
             .enumerate()
-            .filter(|(_, f)| {
-                f.name.to_lowercase().contains(&query) || f.value.to_lowercase().contains(&query)
+            .filter(|(_, r)| {
+                r.name.to_lowercase().contains(&query) || r.value.to_lowercase().contains(&query)
             })
             .map(|(i, _)| i)
             .collect()
     }
 
+    /// The rows-index of the current selection (for match navigation).
+    fn selected_row_index(&self) -> usize {
+        self.visible.get(self.selected_line).copied().unwrap_or(0)
+    }
+
     /// Jumps to the first match at or after the current selection.
     pub fn jump_to_first_match(&mut self, visible_lines: usize) {
         let matches = self.search_matches();
+        let current = self.selected_row_index();
         if let Some(&target) = matches
             .iter()
-            .find(|&&i| i >= self.selected_line)
+            .find(|&&i| i >= current)
             .or_else(|| matches.first())
         {
-            self.select_line(target, visible_lines);
+            self.select_row_index(target, visible_lines);
         }
     }
 
@@ -337,21 +632,22 @@ impl App {
         if matches.is_empty() {
             return;
         }
+        let current = self.selected_row_index();
         let target = if forward {
             matches
                 .iter()
                 .copied()
-                .find(|&i| i > self.selected_line)
+                .find(|&i| i > current)
                 .unwrap_or(matches[0])
         } else {
             matches
                 .iter()
                 .rev()
                 .copied()
-                .find(|&i| i < self.selected_line)
+                .find(|&i| i < current)
                 .unwrap_or(*matches.last().unwrap())
         };
-        self.select_line(target, visible_lines);
+        self.select_row_index(target, visible_lines);
     }
 
     pub fn insert_char(&mut self, c: char) {
@@ -433,6 +729,66 @@ impl App {
         self.input.clear();
         self.cursor_pos = 0;
         self.parse_input();
+    }
+}
+
+/// DFS over packets: assigns packet ids, registers decompressed
+/// buffers as streams (with a fresh color rotation each), and emits
+/// one row per field.
+#[allow(clippy::too_many_arguments)]
+fn walk_packets(
+    packets: &[Packet],
+    stream_idx: usize,
+    depth: u8,
+    parent: Option<usize>,
+    next_id: &mut usize,
+    streams: &mut Vec<Arc<[u8]>>,
+    counters: &mut Vec<u8>,
+    rows: &mut Vec<Row>,
+    packet_parent: &mut Vec<Option<usize>>,
+) {
+    for packet in packets {
+        let id = *next_id;
+        *next_id += 1;
+        packet_parent.push(parent);
+
+        for (i, field) in packet.fields.iter().enumerate() {
+            let color = if field.indent > 0 {
+                let c = counters[stream_idx];
+                counters[stream_idx] = (c + 1) % 12;
+                Some(c)
+            } else {
+                None
+            };
+            rows.push(Row {
+                name: Arc::clone(&field.name),
+                value: Arc::clone(&field.value),
+                span: field.span,
+                indent: field.indent,
+                depth,
+                stream: stream_idx,
+                packet_id: id,
+                is_packet_first: i == 0,
+                color,
+            });
+        }
+
+        if let Some(ref buf) = packet.child_buffer {
+            streams.push(Arc::clone(buf));
+            counters.push(0);
+            let child_stream = streams.len() - 1;
+            walk_packets(
+                &packet.children,
+                child_stream,
+                depth + 1,
+                Some(id),
+                next_id,
+                streams,
+                counters,
+                rows,
+                packet_parent,
+            );
+        }
     }
 }
 

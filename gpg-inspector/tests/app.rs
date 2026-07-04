@@ -4,8 +4,14 @@ const TEST_KEY: &str = include_str!("../../fixtures/test.key");
 
 #[test]
 fn test_panel_focus_next() {
-    assert_eq!(PanelFocus::Input.next(), PanelFocus::Data);
+    assert_eq!(PanelFocus::Input.next(), PanelFocus::Hex);
+    assert_eq!(PanelFocus::Hex.next(), PanelFocus::Data);
     assert_eq!(PanelFocus::Data.next(), PanelFocus::Input);
+
+    // prev is the inverse of next
+    for focus in [PanelFocus::Input, PanelFocus::Hex, PanelFocus::Data] {
+        assert_eq!(focus.next().prev(), focus);
+    }
 }
 
 #[test]
@@ -671,7 +677,7 @@ fn test_nested_fields_flattened_and_flagged() {
 }
 
 #[test]
-fn test_nested_fields_get_no_color_or_highlight() {
+fn test_nested_fields_highlight_in_their_own_stream() {
     let mut app = App::new();
     app.load_binary(TEST_COMPRESSED.to_vec(), "compressed");
 
@@ -689,15 +695,176 @@ fn test_nested_fields_get_no_color_or_highlight() {
         )
     };
 
-    assert_eq!(app.get_field_color(child_field_idx), None);
+    // The decompressed buffer is registered as a second stream
+    assert_eq!(app.streams.len(), 2);
+    assert_eq!(app.color_trackers.len(), 2);
 
+    // Selecting a nested field switches the displayed stream and
+    // highlights within it (colors restart per stream)
+    assert!(app.get_field_color(child_field_idx).is_some());
     app.selected_line = child_field_idx;
     app.update_highlight();
-    assert!(app.highlighted_bytes.is_none());
+    assert!(app.highlighted_bytes.is_some());
+    assert_eq!(app.display_stream(), 1);
+    let child_span = app.rows[child_field_idx].span;
+    assert!(child_span.1 <= app.display_bytes().len());
 
-    // A top-level non-header field still gets both
-    assert!(app.get_field_color(top_idx).is_some());
+    // A top-level field displays the raw stream
     app.selected_line = top_idx;
     app.update_highlight();
+    assert_eq!(app.display_stream(), 0);
     assert!(app.highlighted_bytes.is_some());
+}
+
+// Fold tests
+
+#[test]
+fn test_fold_collapses_packet_rows() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    let total_visible = app.visible.len();
+    let first_packet_rows = app
+        .rows
+        .iter()
+        .filter(|r| r.packet_id == app.rows[0].packet_id)
+        .count();
+    assert!(first_packet_rows > 1);
+
+    // Collapse the first packet: only its header row stays
+    app.selected_line = 0;
+    app.toggle_fold(20);
+    assert_eq!(app.visible.len(), total_visible - (first_packet_rows - 1));
+    assert!(app.collapsed.contains(&app.rows[0].packet_id));
+
+    // Header row still visible and selected
+    assert!(app.selected_row().unwrap().is_packet_first);
+
+    // Expand again restores everything
+    app.toggle_fold(20);
+    assert_eq!(app.visible.len(), total_visible);
+}
+
+#[test]
+fn test_fold_from_inner_row_selects_header() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // Select a non-header row of packet 0 and collapse with h
+    app.selected_line = 2;
+    assert!(!app.selected_row().unwrap().is_packet_first);
+    app.set_fold(true, 20);
+
+    let row = app.selected_row().unwrap();
+    assert!(row.is_packet_first);
+    assert_eq!(row.packet_id, app.rows[0].packet_id);
+}
+
+#[test]
+fn test_search_jump_auto_expands() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // Collapse everything
+    let ids: Vec<usize> = app
+        .packet_parent
+        .iter()
+        .enumerate()
+        .map(|(i, _)| i)
+        .collect();
+    for id in ids {
+        app.collapsed.insert(id);
+    }
+    app.rebuild_visible();
+    assert!(app.visible.len() < app.rows.len());
+
+    // Jump to a fingerprint field hidden inside a collapsed packet
+    app.search_query = "fingerprint (computed)".to_string();
+    app.jump_to_first_match(20);
+
+    let row = app.selected_row().expect("nothing selected");
+    assert!(row.name.to_lowercase().contains("fingerprint"));
+}
+
+#[test]
+fn test_packet_foldable() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // Real packets have fields beyond the header
+    assert!(app.packet_foldable(app.rows[0].packet_id));
+}
+
+// Hex cursor tests
+
+#[test]
+fn test_hex_cursor_moves_and_clamps() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    let len = app.display_bytes().len();
+
+    app.move_hex_cursor(1, 10);
+    assert_eq!(app.hex_cursor, 1);
+
+    app.move_hex_cursor(-5, 10);
+    assert_eq!(app.hex_cursor, 0);
+
+    app.set_hex_cursor(usize::MAX, 10);
+    assert_eq!(app.hex_cursor, len - 1);
+
+    // Scroll followed the cursor to the end
+    assert!(app.hex_scroll > 0);
+
+    app.set_hex_cursor(0, 10);
+    assert_eq!(app.hex_scroll, 0);
+}
+
+#[test]
+fn test_hex_scroll_wheel_clamps() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    let total_lines = app.display_bytes().len().div_ceil(16);
+
+    app.scroll_hex(3);
+    assert_eq!(app.hex_scroll, 3);
+    app.scroll_hex(-10);
+    assert_eq!(app.hex_scroll, 0);
+    app.scroll_hex(isize::MAX);
+    assert_eq!(app.hex_scroll, total_lines - 1);
+}
+
+#[test]
+fn test_jump_to_hex_owner_picks_narrowest() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // The version field of the first key packet is a 1-byte span;
+    // put the cursor on it
+    let version_row_idx = app
+        .rows
+        .iter()
+        .position(|r| r.name.as_ref() == "Version")
+        .unwrap();
+    let (start, _) = app.rows[version_row_idx].span;
+
+    app.set_hex_cursor(start, 10);
+    assert!(app.jump_to_hex_owner(20));
+
+    let selected = app.selected_row().unwrap();
+    assert_eq!(selected.name.as_ref(), "Version");
+    assert_eq!(app.focus, PanelFocus::Data);
+}
+
+#[test]
+fn test_jump_to_hex_owner_no_owner() {
+    let mut app = App::new();
+    // No data at all
+    assert!(!app.jump_to_hex_owner(20));
 }

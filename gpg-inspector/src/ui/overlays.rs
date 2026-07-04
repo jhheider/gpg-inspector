@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
 };
@@ -20,38 +20,58 @@ pub fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     )
 }
 
-pub struct HelpOverlay;
+pub struct HelpOverlay<'a> {
+    app: &'a App,
+}
+
+impl<'a> HelpOverlay<'a> {
+    /// Only used by excluded Widget impl
+    #[cfg(not(tarpaulin_include))]
+    pub fn new(app: &'a App) -> Self {
+        Self { app }
+    }
+}
 
 const HELP_TEXT: &[(&str, &str)] = &[
-    ("Tab / Shift+Tab", "Switch between Input and Data panels"),
+    ("Tab / Shift+Tab", "Cycle focus: Input, Hex, Data"),
     ("Ctrl+C / Ctrl+Q", "Quit"),
     ("F1", "Toggle this help"),
+    ("Mouse", "Click to focus/select, wheel to scroll"),
+    ("", "(Shift+drag for native text selection)"),
     ("", ""),
     ("Input panel", ""),
     ("Left/Right Home/End", "Move cursor"),
     ("Ctrl+A / Ctrl+E", "Cursor to start / end"),
-    ("Ctrl+K", "Clear input"),
+    ("Ctrl+K", "Clear input (exits binary mode)"),
     ("", ""),
     ("Data panel", ""),
     ("Up/Down or k/j", "Move selection"),
     ("PgUp/PgDn Home/End", "Move selection by page / to ends"),
     ("Enter", "Show full field details"),
+    ("Space, h / l", "Fold / unfold the selected packet"),
     ("/", "Search fields (Enter to jump, Esc to cancel)"),
     ("n / N", "Next / previous search match"),
-    ("?", "Toggle this help"),
+    ("y / Y", "Copy value / bytes as hex (OSC 52)"),
+    ("", ""),
+    ("Hex panel", ""),
+    ("h/l j/k arrows", "Move cursor by byte / line"),
+    ("g / G, PgUp/PgDn", "Jump to start / end, page"),
+    ("Enter or f", "Select the field owning this byte"),
+    ("?", "Toggle this help (Data/Hex panels)"),
 ];
 
 /// Renders to terminal buffer - not unit testable
 #[cfg(not(tarpaulin_include))]
-impl Widget for HelpOverlay {
+impl Widget for HelpOverlay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = &self.app.theme;
         let popup = centered_rect(56, HELP_TEXT.len() as u16 + 4, area);
         Clear.render(popup, buf);
 
         let block = Block::default()
             .title(" Help ")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow));
+            .border_style(Style::default().fg(theme.border_focused));
         let inner = block.inner(popup);
         block.render(popup, buf);
 
@@ -65,7 +85,7 @@ impl Widget for HelpOverlay {
                     ))
                 } else {
                     Line::from(vec![
-                        Span::styled(format!("  {:<20}", key), Style::default().fg(Color::Cyan)),
+                        Span::styled(format!("  {:<20}", key), Style::default().fg(theme.accent)),
                         Span::raw(desc.to_string()),
                     ])
                 }
@@ -74,7 +94,7 @@ impl Widget for HelpOverlay {
 
         let footer = Line::from(Span::styled(
             "press ? or Esc to close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme.dim),
         ));
         let mut all_lines = lines;
         all_lines.push(Line::default());
@@ -100,8 +120,8 @@ impl<'a> DetailOverlay<'a> {
 #[cfg(not(tarpaulin_include))]
 impl Widget for DetailOverlay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let fields = self.app.get_all_fields();
-        let Some(field) = fields.get(self.app.selected_line) else {
+        let theme = &self.app.theme;
+        let Some(field) = self.app.selected_row() else {
             return;
         };
 
@@ -116,13 +136,13 @@ impl Widget for DetailOverlay<'_> {
         let block = Block::default()
             .title(format!(" {} ", field.name))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow));
+            .border_style(Style::default().fg(theme.border_focused));
         let inner = block.inner(popup);
         block.render(popup, buf);
 
         let mut lines = vec![
             Line::from(vec![
-                Span::styled("Bytes: ", Style::default().fg(Color::Cyan)),
+                Span::styled("Bytes: ", Style::default().fg(theme.accent)),
                 Span::raw(format!("{:#x}..{:#x} ({} bytes)", start, end, end - start)),
             ]),
             Line::default(),
@@ -131,7 +151,7 @@ impl Widget for DetailOverlay<'_> {
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(
             "press Enter or Esc to close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme.dim),
         )));
 
         Paragraph::new(lines)
