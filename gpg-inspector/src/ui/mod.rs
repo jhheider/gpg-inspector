@@ -38,8 +38,17 @@ pub fn draw(frame: &mut Frame, app: &App) {
         frame.render_widget(DetailOverlay::new(app), size);
     }
     if app.show_help {
-        frame.render_widget(HelpOverlay, size);
+        frame.render_widget(HelpOverlay::new(app), size);
     }
+}
+
+pub fn get_input_panel_area(size: Rect) -> Rect {
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(size);
+
+    main_chunks[0]
 }
 
 pub fn get_hex_panel_area(size: Rect) -> Rect {

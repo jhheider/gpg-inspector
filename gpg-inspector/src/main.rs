@@ -6,7 +6,10 @@ use std::time::Duration;
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use crossterm::{
-    event::{DisableBracketedPaste, EnableBracketedPaste, poll, read},
+    event::{
+        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, poll,
+        read,
+    },
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -41,6 +44,10 @@ struct Cli {
     /// Output as formatted text with hex dump
     #[arg(long)]
     txt: bool,
+
+    /// Color theme for the TUI
+    #[arg(long, value_parser = ["auto", "dark", "light"], default_value = "auto")]
+    theme: String,
 }
 
 /// Requires TTY for terminal setup/teardown
@@ -88,12 +95,21 @@ fn main() -> Result<()> {
 
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        EnableBracketedPaste,
+        EnableMouseCapture
+    )?;
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new();
+    app.theme = gpg_inspector::ui::colors::Theme::resolve(
+        &cli.theme,
+        std::env::var("COLORFGBG").ok().as_deref(),
+    );
     if let Some(input) = initial_input {
         if gpg_inspector_lib::looks_binary(&input) {
             let origin = cli
@@ -116,7 +132,8 @@ fn main() -> Result<()> {
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableBracketedPaste
+        DisableBracketedPaste,
+        DisableMouseCapture
     )?;
     terminal.show_cursor()?;
 

@@ -1,13 +1,12 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Widget},
 };
 
 use crate::app::{App, PanelFocus};
-use crate::ui::colors::get_color;
 
 pub struct DataPanel<'a> {
     app: &'a App,
@@ -27,14 +26,17 @@ impl Widget for DataPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let focused = self.app.focus == PanelFocus::Data;
 
+        let theme = &self.app.theme;
         let border_color = if focused {
-            Color::Yellow
+            theme.border_focused
         } else {
-            Color::DarkGray
+            theme.border
         };
 
         let matches = self.app.search_matches();
-        let title = if self.app.search_active {
+        let title = if let Some(ref status) = self.app.status_message {
+            format!(" Decoded Data — {} ", status)
+        } else if self.app.search_active {
             format!(" Decoded Data — /{}█ ", self.app.search_query)
         } else if !self.app.search_query.is_empty() {
             format!(
@@ -83,8 +85,8 @@ impl Widget for DataPanel<'_> {
             let indent = row.indent as usize + row.depth as usize * 2;
 
             let color = match row.color {
-                Some(idx) => get_color(idx),
-                None => Color::White, // Headers are white
+                Some(idx) => theme.color(idx),
+                None => theme.header,
             };
 
             // Fold marker on foldable packet header rows
@@ -101,7 +103,7 @@ impl Widget for DataPanel<'_> {
 
             let mut name_style = if is_selected {
                 Style::default()
-                    .fg(Color::Black)
+                    .fg(theme.selection_fg)
                     .bg(color)
                     .add_modifier(Modifier::BOLD)
             } else {
@@ -112,9 +114,9 @@ impl Widget for DataPanel<'_> {
             }
 
             let value_style = if is_selected {
-                Style::default().fg(Color::Black).bg(Color::DarkGray)
+                Style::default().fg(theme.selection_fg).bg(theme.dim)
             } else {
-                Style::default().fg(Color::Gray)
+                Style::default().fg(theme.text)
             };
 
             // Calculate widths with indentation
@@ -131,7 +133,7 @@ impl Widget for DataPanel<'_> {
                     format!("{:<width$}", truncated_name, width = name_width),
                     name_style,
                 ),
-                Span::styled(" : ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" : ", Style::default().fg(theme.dim)),
                 Span::styled(truncated_value, value_style),
             ];
 

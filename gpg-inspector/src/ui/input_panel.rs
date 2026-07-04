@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::Style,
     text::Line,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
@@ -26,10 +26,11 @@ impl Widget for InputPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let focused = self.app.focus == PanelFocus::Input;
 
+        let theme = &self.app.theme;
         let border_color = if focused {
-            Color::Yellow
+            theme.border_focused
         } else {
-            Color::DarkGray
+            theme.border
         };
 
         let title = if let Some(ref err) = self.app.error_message {
@@ -64,7 +65,7 @@ impl Widget for InputPanel<'_> {
                 self.app.packets.len()
             );
             Paragraph::new(summary)
-                .style(Style::default().fg(Color::Gray))
+                .style(Style::default().fg(theme.text))
                 .wrap(Wrap { trim: false })
                 .render(inner, buf);
         } else if self.app.input.is_empty() {
@@ -72,7 +73,7 @@ impl Widget for InputPanel<'_> {
                 "Paste armored GPG data here...\n\n\
                  Tab: switch panels   F1: help   Ctrl+Q: quit",
             )
-            .style(Style::default().fg(Color::DarkGray))
+            .style(Style::default().fg(theme.dim))
             .wrap(Wrap { trim: false });
             placeholder.render(inner, buf);
         } else {
@@ -80,7 +81,7 @@ impl Widget for InputPanel<'_> {
             let lines: Vec<Line> = text.lines().map(|l| Line::from(l.to_string())).collect();
 
             let paragraph = Paragraph::new(lines)
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(theme.text))
                 .wrap(Wrap { trim: false });
 
             paragraph.render(inner, buf);
@@ -92,7 +93,8 @@ impl Widget for InputPanel<'_> {
                     let x = inner.x + cursor_x as u16;
                     let y = inner.y + cursor_y as u16;
                     if x < inner.x + inner.width && y < inner.y + inner.height {
-                        buf[(x, y)].set_style(Style::default().bg(Color::White).fg(Color::Black));
+                        buf[(x, y)]
+                            .set_style(Style::default().bg(theme.text).fg(theme.selection_fg));
                     }
                 }
             }

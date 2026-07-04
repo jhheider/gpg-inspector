@@ -115,3 +115,45 @@ fn test_truncate_chars() {
     assert_eq!(truncate_chars("▾ Packet: Public Key", 10), "▾ Packe...");
     assert_eq!(truncate_chars("héllo wörld exträ", 10), "héllo w...");
 }
+
+// Theme tests
+
+use gpg_inspector::ui::colors::{LIGHT_PALETTE, Theme};
+
+#[test]
+fn test_theme_from_colorfgbg() {
+    assert_eq!(Theme::from_colorfgbg(None), Theme::dark());
+    assert_eq!(Theme::from_colorfgbg(Some("15;0")), Theme::dark());
+    assert_eq!(Theme::from_colorfgbg(Some("0;15")), Theme::light());
+    assert_eq!(Theme::from_colorfgbg(Some("0;default;7")), Theme::light());
+    assert_eq!(Theme::from_colorfgbg(Some("garbage")), Theme::dark());
+    assert_eq!(Theme::from_colorfgbg(Some("")), Theme::dark());
+}
+
+#[test]
+fn test_theme_resolve() {
+    assert_eq!(Theme::resolve("dark", Some("0;15")), Theme::dark());
+    assert_eq!(Theme::resolve("light", None), Theme::light());
+    assert_eq!(Theme::resolve("auto", Some("0;15")), Theme::light());
+    assert_eq!(Theme::resolve("auto", None), Theme::dark());
+    assert_eq!(Theme::default(), Theme::dark());
+}
+
+#[test]
+fn test_theme_color_wraps() {
+    let theme = Theme::dark();
+    assert_eq!(theme.color(0), theme.color(12));
+    assert_eq!(theme.color(0), PALETTE[0]);
+
+    let light = Theme::light();
+    assert_eq!(light.color(3), LIGHT_PALETTE[3]);
+}
+
+#[test]
+fn test_light_palette_distinct() {
+    for i in 0..12 {
+        for j in (i + 1)..12 {
+            assert_ne!(LIGHT_PALETTE[i], LIGHT_PALETTE[j]);
+        }
+    }
+}

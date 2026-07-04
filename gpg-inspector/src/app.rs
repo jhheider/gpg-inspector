@@ -3,19 +3,30 @@ use std::sync::Arc;
 
 use gpg_inspector_lib::{ArmorBlock, Packet};
 
-use crate::ui::colors::ColorTracker;
+use crate::ui::colors::{ColorTracker, Theme};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelFocus {
     Input,
+    Hex,
     Data,
 }
 
 impl PanelFocus {
+    /// Tab order matches the visual layout: input, hex, data.
     pub fn next(self) -> Self {
         match self {
-            PanelFocus::Input => PanelFocus::Data,
+            PanelFocus::Input => PanelFocus::Hex,
+            PanelFocus::Hex => PanelFocus::Data,
             PanelFocus::Data => PanelFocus::Input,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            PanelFocus::Input => PanelFocus::Data,
+            PanelFocus::Hex => PanelFocus::Input,
+            PanelFocus::Data => PanelFocus::Hex,
         }
     }
 }
@@ -75,6 +86,12 @@ pub struct App {
     pub visible: Vec<usize>,
     pub focus: PanelFocus,
     pub hex_scroll: usize,
+    /// Byte offset of the hex panel cursor (when the hex panel is
+    /// focused), within the displayed stream.
+    pub hex_cursor: usize,
+    /// One-shot feedback line (e.g. clipboard confirmation), shown in
+    /// the data panel title and cleared on the next keypress.
+    pub status_message: Option<String>,
     pub data_scroll: usize,
     /// Index into `visible` of the selected row.
     pub selected_line: usize,
@@ -85,6 +102,7 @@ pub struct App {
     pub show_detail: bool,
     pub search_active: bool,
     pub search_query: String,
+    pub theme: Theme,
 }
 
 impl App {
@@ -105,6 +123,8 @@ impl App {
             visible: Vec::new(),
             focus: PanelFocus::Input,
             hex_scroll: 0,
+            hex_cursor: 0,
+            status_message: None,
             data_scroll: 0,
             selected_line: 0,
             highlighted_bytes: None,
@@ -114,6 +134,7 @@ impl App {
             show_detail: false,
             search_active: false,
             search_query: String::new(),
+            theme: Theme::default(),
         }
     }
 
@@ -318,8 +339,10 @@ impl App {
     fn clamp_selection(&mut self) {
         self.selected_line = self.selected_line.min(self.visible.len().saturating_sub(1));
         self.data_scroll = self.data_scroll.min(self.selected_line);
-        let hex_lines = self.display_bytes().len().div_ceil(16);
+        let display_len = self.display_bytes().len();
+        let hex_lines = display_len.div_ceil(16);
         self.hex_scroll = self.hex_scroll.min(hex_lines.saturating_sub(1));
+        self.hex_cursor = self.hex_cursor.min(display_len.saturating_sub(1));
         self.update_highlight();
     }
 
@@ -418,6 +441,82 @@ impl App {
 
     pub fn update_highlight(&mut self) {
         self.highlighted_bytes = self.selected_row().map(|r| r.span);
+    }
+
+    /// Moves the hex cursor by `delta` bytes within the displayed
+    /// stream; the hex scroll follows the cursor.
+    pub fn move_hex_cursor(&mut self, delta: isize, visible_lines: usize) {
+        let target = if delta >= 0 {
+            self.hex_cursor.saturating_add(delta as usize)
+        } else {
+            self.hex_cursor.saturating_sub((-delta) as usize)
+        };
+        self.set_hex_cursor(target, visible_lines);
+    }
+
+    /// Places the hex cursor at a byte offset (clamped) and scrolls it
+    /// into view.
+    pub fn set_hex_cursor(&mut self, offset: usize, visible_lines: usize) {
+        let len = self.display_bytes().len();
+        if len == 0 {
+            return;
+        }
+        self.hex_cursor = offset.min(len - 1);
+        let line = self.hex_cursor / 16;
+        if line < self.hex_scroll {
+            self.hex_scroll = line;
+        } else if visible_lines > 0 && line >= self.hex_scroll + visible_lines {
+            self.hex_scroll = line + 1 - visible_lines;
+        }
+    }
+
+    /// Scrolls the hex view without moving the cursor (mouse wheel).
+    pub fn scroll_hex(&mut self, delta: isize) {
+        let total_lines = self.display_bytes().len().div_ceil(16);
+        let target = if delta >= 0 {
+            self.hex_scroll.saturating_add(delta as usize)
+        } else {
+            self.hex_scroll.saturating_sub((-delta) as usize)
+        };
+        self.hex_scroll = target.min(total_lines.saturating_sub(1));
+    }
+
+    /// Jumps the data selection to the row owning the byte under the
+    /// hex cursor: the narrowest containing span in the displayed
+    /// stream, preferring deeper-indented rows on ties. Focus moves to
+    /// the data panel on success.
+    pub fn jump_to_hex_owner(&mut self, data_visible_lines: usize) -> bool {
+        let stream = self.display_stream();
+        let pos = self.hex_cursor;
+
+        let mut best: Option<(usize, usize, u8)> = None; // (row_idx, size, indent)
+        for (i, row) in self.rows.iter().enumerate() {
+            if row.stream != stream {
+                continue;
+            }
+            let (start, end) = row.span;
+            if pos < start || pos >= end {
+                continue;
+            }
+            let size = end - start;
+            let better = match best {
+                None => true,
+                Some((_, best_size, best_indent)) => {
+                    size < best_size || (size == best_size && row.indent > best_indent)
+                }
+            };
+            if better {
+                best = Some((i, size, row.indent));
+            }
+        }
+
+        if let Some((row_idx, _, _)) = best {
+            self.select_row_index(row_idx, data_visible_lines);
+            self.focus = PanelFocus::Data;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn scroll_hex_to_highlight(&mut self, visible_lines: usize) {

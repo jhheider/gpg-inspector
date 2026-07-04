@@ -220,6 +220,9 @@ fn test_tab_cycles_focus() {
     assert_eq!(app.focus, PanelFocus::Input);
 
     handle_event(&mut app, key_event(KeyCode::Tab), test_rect());
+    assert_eq!(app.focus, PanelFocus::Hex);
+
+    handle_event(&mut app, key_event(KeyCode::Tab), test_rect());
     assert_eq!(app.focus, PanelFocus::Data);
 
     handle_event(&mut app, key_event(KeyCode::Tab), test_rect());
@@ -230,6 +233,9 @@ fn test_tab_cycles_focus() {
 fn test_backtab_cycles_focus() {
     let mut app = App::new();
     app.focus = PanelFocus::Data;
+
+    handle_event(&mut app, key_event(KeyCode::BackTab), test_rect());
+    assert_eq!(app.focus, PanelFocus::Hex);
 
     handle_event(&mut app, key_event(KeyCode::BackTab), test_rect());
     assert_eq!(app.focus, PanelFocus::Input);
@@ -561,4 +567,198 @@ fn test_binary_mode_ctrl_k_resets() {
     handle_event(&mut app, key_event_ctrl(KeyCode::Char('k')), test_rect());
     assert!(!app.is_binary());
     assert!(app.packets.is_empty());
+}
+
+// Hex panel focus tests
+
+#[test]
+fn test_hex_panel_keys() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Hex;
+
+    handle_event(&mut app, key_event(KeyCode::Char('l')), test_rect());
+    assert_eq!(app.hex_cursor, 1);
+    handle_event(&mut app, key_event(KeyCode::Char('j')), test_rect());
+    assert_eq!(app.hex_cursor, 17);
+    handle_event(&mut app, key_event(KeyCode::Char('k')), test_rect());
+    assert_eq!(app.hex_cursor, 1);
+    handle_event(&mut app, key_event(KeyCode::Char('h')), test_rect());
+    assert_eq!(app.hex_cursor, 0);
+
+    handle_event(&mut app, key_event(KeyCode::Char('G')), test_rect());
+    assert_eq!(app.hex_cursor, app.display_bytes().len() - 1);
+    handle_event(&mut app, key_event(KeyCode::Char('g')), test_rect());
+    assert_eq!(app.hex_cursor, 0);
+}
+
+#[test]
+fn test_hex_enter_jumps_to_owning_field() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Hex;
+
+    // Byte 3 is the key packet's version octet
+    app.set_hex_cursor(3, 10);
+    handle_event(&mut app, key_event(KeyCode::Enter), test_rect());
+
+    assert_eq!(app.focus, PanelFocus::Data);
+    assert_eq!(app.selected_row().unwrap().name.as_ref(), "Version");
+}
+
+#[test]
+fn test_question_mark_opens_help_in_hex_panel() {
+    let mut app = App::new();
+    app.focus = PanelFocus::Hex;
+    handle_event(&mut app, key_event(KeyCode::Char('?')), test_rect());
+    assert!(app.show_help);
+}
+
+// Fold key tests
+
+#[test]
+fn test_space_toggles_fold() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+    let total = app.visible.len();
+
+    handle_event(&mut app, key_event(KeyCode::Char(' ')), test_rect());
+    assert!(app.visible.len() < total);
+
+    handle_event(&mut app, key_event(KeyCode::Char(' ')), test_rect());
+    assert_eq!(app.visible.len(), total);
+}
+
+// Clipboard tests
+
+#[test]
+fn test_yank_value_sets_status() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+    app.selected_line = 1;
+    app.update_highlight();
+
+    handle_event(&mut app, key_event(KeyCode::Char('y')), test_rect());
+    let status = app.status_message.clone().expect("no status after yank");
+    assert!(status.starts_with("Copied"), "status: {}", status);
+
+    // Any next key clears the status
+    handle_event(&mut app, key_event(KeyCode::Char('j')), test_rect());
+    assert!(app.status_message.is_none());
+}
+
+#[test]
+fn test_yank_bytes_sets_status() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+    app.selected_line = 1;
+    app.update_highlight();
+
+    handle_event(&mut app, key_event(KeyCode::Char('Y')), test_rect());
+    let status = app.status_message.clone().expect("no status after yank");
+    assert!(status.contains("bytes as hex"), "status: {}", status);
+}
+
+#[test]
+fn test_yank_in_detail_overlay() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+    app.show_detail = true;
+
+    handle_event(&mut app, key_event(KeyCode::Char('y')), test_rect());
+    assert!(app.status_message.is_some());
+    assert!(app.show_detail, "yank must not close the detail view");
+}
+
+// Mouse tests
+
+use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+
+fn mouse_event(kind: MouseEventKind, column: u16, row: u16) -> Event {
+    Event::Mouse(MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    })
+}
+
+#[test]
+fn test_mouse_wheel_scrolls_data_panel() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // Data panel is the bottom-right quadrant of the 120x40 test rect
+    handle_event(
+        &mut app,
+        mouse_event(MouseEventKind::ScrollDown, 90, 30),
+        test_rect(),
+    );
+    assert_eq!(app.selected_line, 3);
+
+    handle_event(
+        &mut app,
+        mouse_event(MouseEventKind::ScrollUp, 90, 30),
+        test_rect(),
+    );
+    assert_eq!(app.selected_line, 0);
+}
+
+#[test]
+fn test_mouse_wheel_scrolls_hex_panel() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // Hex panel is the top-right quadrant
+    handle_event(
+        &mut app,
+        mouse_event(MouseEventKind::ScrollDown, 90, 10),
+        test_rect(),
+    );
+    assert_eq!(app.hex_scroll, 3);
+}
+
+#[test]
+fn test_mouse_click_selects_and_focuses() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    // Click the third row of the data panel (border at y=20, rows from 21)
+    handle_event(
+        &mut app,
+        mouse_event(MouseEventKind::Down(MouseButton::Left), 90, 23),
+        test_rect(),
+    );
+    assert_eq!(app.focus, PanelFocus::Data);
+    assert_eq!(app.selected_line, 2);
+
+    // Click in the hex panel focuses it and places the cursor
+    handle_event(
+        &mut app,
+        mouse_event(MouseEventKind::Down(MouseButton::Left), 90, 2),
+        test_rect(),
+    );
+    assert_eq!(app.focus, PanelFocus::Hex);
+    assert_eq!(app.hex_cursor, 16);
+
+    // Click in the input panel focuses it
+    handle_event(
+        &mut app,
+        mouse_event(MouseEventKind::Down(MouseButton::Left), 10, 10),
+        test_rect(),
+    );
+    assert_eq!(app.focus, PanelFocus::Input);
 }
