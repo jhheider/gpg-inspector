@@ -62,11 +62,11 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 |-----|-------------|---------|--------|-------|
 | 0 | Reserved | — | ⬜ N/A | Must not appear |
 | 1 | Public-Key Encrypted Session Key | 5.1 | ✅ Complete | Version, key ID, algorithm, encrypted data |
-| 2 | Signature | 5.2 | ✅ Complete | V3, V4, V5 with all subpackets |
+| 2 | Signature | 5.2 | ✅ Complete | V3, V4 (V6 per RFC 9580); draft V5 shares the V4 wire layout |
 | 3 | Symmetric-Key Encrypted Session Key | 5.3 | ✅ Complete | Version, algorithm, S2K, encrypted key |
 | 4 | One-Pass Signature | 5.4 | ✅ Complete | Version, type, algorithms, key ID, nested flag |
 | 5 | Secret-Key | 5.5.1.3 | ✅ Complete | Public key + encrypted private material |
-| 6 | Public-Key | 5.5.1.1 | ✅ Complete | V4/V5, creation time, algorithm, key material |
+| 6 | Public-Key | 5.5.1.1 | ✅ Complete | V4 (V6 per RFC 9580); V3 and draft-V5 keys not supported |
 | 7 | Secret-Subkey | 5.5.1.4 | ✅ Complete | Same as Secret-Key |
 | 8 | Compressed Data | 5.6 | ✅ Complete | Algorithm ID extracted |
 | 9 | Symmetrically Encrypted Data | 5.7 | ✅ Complete | Legacy packet, raw ciphertext |
@@ -236,7 +236,7 @@ These features require cryptographic operations and are outside the scope of an 
 
 ---
 
-## RFC 9580 (OpenPGP v5) Extensions
+## RFC 9580 (OpenPGP v6) Extensions
 
 gpg-inspector also supports these RFC 9580 extensions:
 

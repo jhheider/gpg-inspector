@@ -386,6 +386,7 @@ fn test_skesk_v4_twofish() {
 // =============================================================================
 
 /// Build SKESK v6 with Iterated S2K (type 3) and AEAD
+#[allow(clippy::too_many_arguments)]
 fn build_skesk_v6(
     cipher: u8,
     aead: u8,
@@ -433,6 +434,7 @@ fn build_skesk_v6(
 }
 
 /// Build SKESK v6 with Argon2 S2K (type 4)
+#[allow(clippy::too_many_arguments)]
 fn build_skesk_v6_argon2(
     cipher: u8,
     aead: u8,
@@ -768,7 +770,7 @@ fn test_skesk_v6_unknown_aead_algorithm() {
 
     let s2k_len = 1 + 1 + 8 + 1; // type + hash + salt + count
     let info_len = 1 + 1 + s2k_len; // cipher + aead + s2k_len
-    let actual_body_len = 1 + 1 + 1 + 1 + 1 + s2k_len + 16 + 0 + 16;
+    let actual_body_len = (1 + 1 + 1 + 1 + 1 + s2k_len + 16) + 16;
 
     packet.push(actual_body_len as u8);
     packet.push(6); // Version 6

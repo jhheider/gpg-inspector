@@ -27,7 +27,7 @@ just coverage
 
 # Direct cargo commands
 cargo test --workspace --all-features
-cargo clippy --all-features -- -D warnings
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo fmt --all -- --check
 ```
 
@@ -75,4 +75,4 @@ Tests in `gpg-inspector-lib/tests/`:
 
 ## Coverage
 
-The library maintains 100% line coverage. When adding new parsing code, add corresponding tests in `tests/packets/`.
+The library strives to maintain 100% line coverage. When adding new parsing code, add corresponding tests in `tests/packets/`.

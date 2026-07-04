@@ -151,9 +151,9 @@ fn test_theme_color_wraps() {
 
 #[test]
 fn test_light_palette_distinct() {
-    for i in 0..12 {
-        for j in (i + 1)..12 {
-            assert_ne!(LIGHT_PALETTE[i], LIGHT_PALETTE[j]);
+    for (i, color) in LIGHT_PALETTE.iter().enumerate() {
+        for other in &LIGHT_PALETTE[i + 1..] {
+            assert_ne!(color, other);
         }
     }
 }

@@ -10,14 +10,8 @@ fn build_one_pass_signature_v3(
     key_id: &[u8; 8],
     nested: u8,
 ) -> Vec<u8> {
-    let mut packet = Vec::new();
-    packet.push(0xC0 | 4); // Tag 4 = One-Pass Signature
-    packet.push(13); // Body length: 1 + 1 + 1 + 1 + 8 + 1 = 13
-
-    packet.push(3); // Version 3
-    packet.push(sig_type);
-    packet.push(hash_algo);
-    packet.push(pk_algo);
+    // Tag 4 = One-Pass Signature; body length 13 = 1+1+1+1+8+1; version 3
+    let mut packet = vec![0xC0 | 4, 13, 3, sig_type, hash_algo, pk_algo];
     packet.extend_from_slice(key_id);
     packet.push(nested);
 
