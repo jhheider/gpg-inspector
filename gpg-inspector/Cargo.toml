@@ -7,7 +7,7 @@ repository.workspace = true
 license.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "A terminal UI for inspecting GPG/OpenPGP packet structures with a synchronized hex view"
+description = "A TUI for parsing and inspecting OpenPGP (GPG) packets according to RFC 4880 and RFC 9580"
 readme = "../README.md"
 
 [features]
