@@ -45,10 +45,171 @@ fn test_ctrl_q_quits() {
 }
 
 #[test]
-fn test_esc_quits() {
+fn test_esc_does_not_quit() {
+    // Esc used to quit; it must not, to avoid accidental data loss
     let mut app = App::new();
     handle_event(&mut app, key_event(KeyCode::Esc), test_rect());
-    assert!(app.should_quit);
+    assert!(!app.should_quit);
+}
+
+// Help overlay tests
+
+#[test]
+fn test_f1_toggles_help() {
+    let mut app = App::new();
+    handle_event(&mut app, key_event(KeyCode::F(1)), test_rect());
+    assert!(app.show_help);
+    handle_event(&mut app, key_event(KeyCode::F(1)), test_rect());
+    assert!(!app.show_help);
+}
+
+#[test]
+fn test_question_mark_opens_help_in_data_panel() {
+    let mut app = App::new();
+    app.focus = PanelFocus::Data;
+    handle_event(&mut app, key_event(KeyCode::Char('?')), test_rect());
+    assert!(app.show_help);
+}
+
+#[test]
+fn test_question_mark_is_text_in_input_panel() {
+    let mut app = App::new();
+    app.focus = PanelFocus::Input;
+    handle_event(&mut app, key_event(KeyCode::Char('?')), test_rect());
+    assert!(!app.show_help);
+    assert_eq!(app.input, "?");
+}
+
+#[test]
+fn test_help_swallows_keys_and_closes_on_esc() {
+    let mut app = App::new();
+    app.show_help = true;
+    app.focus = PanelFocus::Input;
+
+    // Other keys are swallowed, not typed into the input
+    handle_event(&mut app, key_event(KeyCode::Char('x')), test_rect());
+    assert!(app.show_help);
+    assert!(app.input.is_empty());
+
+    handle_event(&mut app, key_event(KeyCode::Esc), test_rect());
+    assert!(!app.show_help);
+    assert!(!app.should_quit);
+}
+
+// Detail view tests
+
+#[test]
+fn test_enter_opens_detail_in_data_panel() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+
+    handle_event(&mut app, key_event(KeyCode::Enter), test_rect());
+    assert!(app.show_detail);
+
+    handle_event(&mut app, key_event(KeyCode::Enter), test_rect());
+    assert!(!app.show_detail);
+}
+
+#[test]
+fn test_enter_no_detail_when_empty() {
+    let mut app = App::new();
+    app.focus = PanelFocus::Data;
+    handle_event(&mut app, key_event(KeyCode::Enter), test_rect());
+    assert!(!app.show_detail);
+}
+
+#[test]
+fn test_detail_closes_on_esc() {
+    let mut app = App::new();
+    app.show_detail = true;
+    handle_event(&mut app, key_event(KeyCode::Esc), test_rect());
+    assert!(!app.show_detail);
+    assert!(!app.should_quit);
+}
+
+// Search tests
+
+#[test]
+fn test_search_flow() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+
+    // `/` opens search
+    handle_event(&mut app, key_event(KeyCode::Char('/')), test_rect());
+    assert!(app.search_active);
+
+    // Typing builds the query
+    for c in "version".chars() {
+        handle_event(&mut app, key_event(KeyCode::Char(c)), test_rect());
+    }
+    assert_eq!(app.search_query, "version");
+
+    // Backspace edits it
+    handle_event(&mut app, key_event(KeyCode::Backspace), test_rect());
+    assert_eq!(app.search_query, "versio");
+    handle_event(&mut app, key_event(KeyCode::Char('n')), test_rect());
+
+    // Enter confirms and jumps to the first match
+    handle_event(&mut app, key_event(KeyCode::Enter), test_rect());
+    assert!(!app.search_active);
+    let matches = app.search_matches();
+    assert!(!matches.is_empty());
+    assert_eq!(app.selected_line, matches[0]);
+}
+
+#[test]
+fn test_search_esc_cancels() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+
+    handle_event(&mut app, key_event(KeyCode::Char('/')), test_rect());
+    handle_event(&mut app, key_event(KeyCode::Char('v')), test_rect());
+    handle_event(&mut app, key_event(KeyCode::Esc), test_rect());
+    assert!(!app.search_active);
+    assert!(app.search_query.is_empty());
+    assert!(!app.should_quit);
+}
+
+#[test]
+fn test_search_next_prev_match() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.focus = PanelFocus::Data;
+    app.search_query = "version".to_string();
+
+    let matches = app.search_matches();
+    assert!(matches.len() >= 2, "test key should have multiple versions");
+
+    app.selected_line = matches[0];
+    handle_event(&mut app, key_event(KeyCode::Char('n')), test_rect());
+    assert_eq!(app.selected_line, matches[1]);
+
+    handle_event(&mut app, key_event(KeyCode::Char('N')), test_rect());
+    assert_eq!(app.selected_line, matches[0]);
+
+    // Wraps around backwards from the first match
+    handle_event(&mut app, key_event(KeyCode::Char('N')), test_rect());
+    assert_eq!(app.selected_line, *matches.last().unwrap());
+
+    // ... and forwards from the last
+    handle_event(&mut app, key_event(KeyCode::Char('n')), test_rect());
+    assert_eq!(app.selected_line, matches[0]);
+}
+
+#[test]
+fn test_search_unknown_key_ignored() {
+    let mut app = App::new();
+    app.focus = PanelFocus::Data;
+    app.search_active = true;
+    handle_event(&mut app, key_event(KeyCode::F(5)), test_rect());
+    assert!(app.search_active);
 }
 
 // Focus tests
@@ -230,7 +391,7 @@ fn test_input_unknown_key_noop() {
     app.focus = PanelFocus::Input;
     app.input = "test".to_string();
 
-    handle_event(&mut app, key_event(KeyCode::F(1)), test_rect());
+    handle_event(&mut app, key_event(KeyCode::F(5)), test_rect());
     assert_eq!(app.input, "test");
 }
 
@@ -243,7 +404,7 @@ fn test_data_unknown_key_noop() {
     app.focus = PanelFocus::Data;
     app.selected_line = 5;
 
-    handle_event(&mut app, key_event(KeyCode::F(1)), test_rect());
+    handle_event(&mut app, key_event(KeyCode::F(5)), test_rect());
     assert_eq!(app.selected_line, 5);
 }
 

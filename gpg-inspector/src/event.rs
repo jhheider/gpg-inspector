@@ -35,6 +35,29 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
         return;
     }
 
+    // Modal states swallow all keys until dismissed
+    if app.show_help {
+        if matches!(
+            key.code,
+            KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc | KeyCode::F(1)
+        ) {
+            app.show_help = false;
+        }
+        return;
+    }
+
+    if app.show_detail {
+        if matches!(key.code, KeyCode::Enter | KeyCode::Char('q') | KeyCode::Esc) {
+            app.show_detail = false;
+        }
+        return;
+    }
+
+    if app.search_active {
+        handle_search_key(app, key, size);
+        return;
+    }
+
     match key.code {
         KeyCode::Tab => {
             app.focus = app.focus.next();
@@ -45,13 +68,37 @@ fn handle_key(app: &mut App, key: KeyEvent, size: Rect) {
                 PanelFocus::Data => PanelFocus::Input,
             };
         }
-        KeyCode::Esc => {
-            app.should_quit = true;
+        KeyCode::F(1) => {
+            app.show_help = true;
         }
+        // Esc intentionally does nothing; quit is Ctrl+C / Ctrl+Q
         _ => match app.focus {
             PanelFocus::Input => handle_input_key(app, key),
             PanelFocus::Data => handle_data_key(app, key, size),
         },
+    }
+}
+
+fn handle_search_key(app: &mut App, key: KeyEvent, size: Rect) {
+    let data_area = get_data_panel_area(size);
+    let visible_lines = data_panel::data_panel_visible_lines(data_area);
+
+    match key.code {
+        KeyCode::Esc => {
+            app.search_active = false;
+            app.search_query.clear();
+        }
+        KeyCode::Enter => {
+            app.search_active = false;
+            app.jump_to_first_match(visible_lines);
+        }
+        KeyCode::Backspace => {
+            app.search_query.pop();
+        }
+        KeyCode::Char(c) => {
+            app.search_query.push(c);
+        }
+        _ => {}
     }
 }
 
@@ -114,6 +161,24 @@ fn handle_data_key(app: &mut App, key: KeyEvent, size: Rect) {
             app.data_scroll = total.saturating_sub(visible_lines);
             app.update_highlight();
             app.scroll_hex_to_highlight(visible_lines);
+        }
+        KeyCode::Enter => {
+            if !app.get_all_fields().is_empty() {
+                app.show_detail = true;
+            }
+        }
+        KeyCode::Char('/') => {
+            app.search_active = true;
+            app.search_query.clear();
+        }
+        KeyCode::Char('n') => {
+            app.jump_to_match(true, visible_lines);
+        }
+        KeyCode::Char('N') => {
+            app.jump_to_match(false, visible_lines);
+        }
+        KeyCode::Char('?') => {
+            app.show_help = true;
         }
         _ => {}
     }

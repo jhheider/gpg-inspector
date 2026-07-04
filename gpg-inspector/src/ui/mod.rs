@@ -2,6 +2,7 @@ pub mod colors;
 pub mod data_panel;
 pub mod hex_panel;
 pub mod input_panel;
+pub mod overlays;
 
 use ratatui::{
     Frame,
@@ -12,6 +13,7 @@ use crate::app::App;
 use data_panel::DataPanel;
 use hex_panel::HexPanel;
 use input_panel::InputPanel;
+use overlays::{DetailOverlay, HelpOverlay};
 
 /// Requires Frame which needs terminal backend
 #[cfg(not(tarpaulin_include))]
@@ -31,6 +33,13 @@ pub fn draw(frame: &mut Frame, app: &App) {
     frame.render_widget(InputPanel::new(app), main_chunks[0]);
     frame.render_widget(HexPanel::new(app), right_chunks[0]);
     frame.render_widget(DataPanel::new(app), right_chunks[1]);
+
+    if app.show_detail {
+        frame.render_widget(DetailOverlay::new(app), size);
+    }
+    if app.show_help {
+        frame.render_widget(HelpOverlay, size);
+    }
 }
 
 pub fn get_hex_panel_area(size: Rect) -> Rect {
