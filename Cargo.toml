@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["gpg-inspector", "gpg-inspector-lib"]
-default-members = ["gpg-inspector"]
+members = ["crates/gpg-inspector", "crates/gpg-inspector-lib"]
+default-members = ["crates/gpg-inspector"]
 
 [workspace.package]
 version = "0.8.0"

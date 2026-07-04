@@ -66,7 +66,7 @@ A terminal UI built with `ratatui` that displays parsed packets with synchronize
 
 ## Test Organization
 
-Tests in `gpg-inspector-lib/tests/`:
+Tests in `crates/gpg-inspector-lib/tests/`:
 - `packets/` - Unit tests for each packet type using constructed byte sequences
 - `integration.rs` - Re-exports packet tests plus integration tests
 - `lookup.rs`, `signature.rs`, `public_key.rs` - Additional coverage

@@ -1,6 +1,6 @@
 use gpg_inspector::app::{App, PanelFocus};
 
-const TEST_KEY: &str = include_str!("../../fixtures/test.key");
+const TEST_KEY: &str = include_str!("../../../fixtures/test.key");
 
 #[test]
 fn test_panel_focus_next() {
@@ -560,9 +560,9 @@ fn test_select_line_empty_noop() {
 
 // Binary input tests
 
-const TEST_KEY_BIN: &[u8] = include_bytes!("../../fixtures/test.key.gpg");
-const TEST_COMPRESSED: &[u8] = include_bytes!("../../fixtures/test.compressed.gpg");
-const TEST_CLEARTEXT: &str = include_str!("../../fixtures/test.cleartext.asc");
+const TEST_KEY_BIN: &[u8] = include_bytes!("../../../fixtures/test.key.gpg");
+const TEST_COMPRESSED: &[u8] = include_bytes!("../../../fixtures/test.compressed.gpg");
+const TEST_CLEARTEXT: &str = include_str!("../../../fixtures/test.cleartext.asc");
 
 #[test]
 fn test_load_binary_parses_and_focuses_data() {

@@ -178,17 +178,18 @@ implementation-specific and never exported.
 
 ```
 gpg-inspector/
-├── gpg-inspector/        # TUI application
-│   └── src/
-│       ├── main.rs       # Entry point, CLI
-│       ├── app.rs        # Application state
-│       ├── event.rs      # Input handling
-│       └── ui/           # Terminal rendering
-└── gpg-inspector-lib/    # Parsing library
-    └── src/
-        ├── armor.rs      # ASCII armor decoding
-        ├── stream.rs     # Byte stream abstraction
-        └── packet/       # OpenPGP packet parsers
+└── crates/
+    ├── gpg-inspector/        # TUI application
+    │   └── src/
+    │       ├── main.rs       # Entry point, CLI
+    │       ├── app.rs        # Application state
+    │       ├── event.rs      # Input handling
+    │       └── ui/           # Terminal rendering
+    └── gpg-inspector-lib/    # Parsing library
+        └── src/
+            ├── armor.rs      # ASCII armor decoding
+            ├── stream.rs     # Byte stream abstraction
+            └── packet/       # OpenPGP packet parsers
 ```
 
 ## Building and Testing
