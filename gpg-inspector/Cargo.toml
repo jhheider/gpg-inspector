@@ -6,7 +6,7 @@ authors.workspace = true
 repository.workspace = true
 
 [features]
-default = []
+default = ["serde"]
 serde = ["dep:serde", "dep:serde_json", "dep:hex"]
 
 [lints.rust]

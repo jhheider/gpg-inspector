@@ -32,6 +32,10 @@ pub struct App {
     pub highlighted_bytes: Option<(usize, usize)>,
     pub error_message: Option<String>,
     pub should_quit: bool,
+    pub show_help: bool,
+    pub show_detail: bool,
+    pub search_active: bool,
+    pub search_query: String,
 }
 
 impl App {
@@ -49,6 +53,10 @@ impl App {
             highlighted_bytes: None,
             error_message: None,
             should_quit: false,
+            show_help: false,
+            show_detail: false,
+            search_active: false,
+            search_query: String::new(),
         }
     }
 
@@ -58,6 +66,7 @@ impl App {
             self.raw_bytes = Arc::from([]);
             self.color_tracker = ColorTracker::default();
             self.error_message = None;
+            self.clamp_selection();
             return;
         }
 
@@ -86,6 +95,17 @@ impl App {
                 self.error_message = Some(format!("Armor error: {}", e));
             }
         }
+        self.clamp_selection();
+    }
+
+    /// Keeps selection and scroll positions valid when the field count changes.
+    fn clamp_selection(&mut self) {
+        let total = self.get_all_fields().len();
+        self.selected_line = self.selected_line.min(total.saturating_sub(1));
+        self.data_scroll = self.data_scroll.min(self.selected_line);
+        let hex_lines = self.raw_bytes.len().div_ceil(16);
+        self.hex_scroll = self.hex_scroll.min(hex_lines.saturating_sub(1));
+        self.update_highlight();
     }
 
     pub fn get_all_fields(&self) -> Vec<&Field> {
@@ -176,6 +196,76 @@ impl App {
 
         self.update_highlight();
         self.scroll_hex_to_highlight(visible_lines);
+    }
+
+    /// Moves the selection to a specific field and scrolls it into view.
+    pub fn select_line(&mut self, line: usize, visible_lines: usize) {
+        let total = self.get_all_fields().len();
+        if total == 0 {
+            return;
+        }
+        self.selected_line = line.min(total - 1);
+
+        if self.selected_line < self.data_scroll {
+            self.data_scroll = self.selected_line;
+        } else if visible_lines > 0 && self.selected_line >= self.data_scroll + visible_lines {
+            self.data_scroll = self.selected_line.saturating_sub(visible_lines - 1);
+        }
+
+        self.update_highlight();
+        self.scroll_hex_to_highlight(visible_lines);
+    }
+
+    /// Indices of fields whose name or value contains the search query
+    /// (case-insensitive). Empty query matches nothing.
+    pub fn search_matches(&self) -> Vec<usize> {
+        if self.search_query.is_empty() {
+            return Vec::new();
+        }
+        let query = self.search_query.to_lowercase();
+        self.get_all_fields()
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| {
+                f.name.to_lowercase().contains(&query) || f.value.to_lowercase().contains(&query)
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Jumps to the first match at or after the current selection.
+    pub fn jump_to_first_match(&mut self, visible_lines: usize) {
+        let matches = self.search_matches();
+        if let Some(&target) = matches
+            .iter()
+            .find(|&&i| i >= self.selected_line)
+            .or_else(|| matches.first())
+        {
+            self.select_line(target, visible_lines);
+        }
+    }
+
+    /// Jumps to the next (or previous) match, wrapping around.
+    pub fn jump_to_match(&mut self, forward: bool, visible_lines: usize) {
+        let matches = self.search_matches();
+        if matches.is_empty() {
+            return;
+        }
+        let target = if forward {
+            matches
+                .iter()
+                .copied()
+                .find(|&i| i > self.selected_line)
+                .unwrap_or(matches[0])
+        } else {
+            matches
+                .iter()
+                .rev()
+                .copied()
+                .find(|&i| i < self.selected_line)
+                .unwrap_or(*matches.last().unwrap())
+        };
+        self.select_line(target, visible_lines);
     }
 
     pub fn insert_char(&mut self, c: char) {

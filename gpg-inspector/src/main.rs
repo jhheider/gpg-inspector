@@ -33,7 +33,7 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     file: Option<PathBuf>,
 
-    /// Output as JSON (requires --features serde)
+    /// Output as JSON
     #[cfg(feature = "serde")]
     #[arg(long, conflicts_with = "txt")]
     json: bool,

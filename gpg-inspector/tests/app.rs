@@ -416,3 +416,138 @@ fn test_clear_input() {
     assert_eq!(app.cursor_pos, 0);
     assert!(app.packets.is_empty());
 }
+
+// Selection clamping on reparse
+
+#[test]
+fn test_reparse_clamps_selection() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    let total = app.get_all_fields().len();
+    app.selected_line = total - 1;
+    app.data_scroll = total - 1;
+    app.update_highlight();
+
+    // Clearing the input shrinks the field list to zero
+    app.clear_input();
+    assert_eq!(app.selected_line, 0);
+    assert_eq!(app.data_scroll, 0);
+    assert_eq!(app.hex_scroll, 0);
+    assert!(app.highlighted_bytes.is_none());
+}
+
+#[test]
+fn test_reparse_keeps_valid_selection() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.selected_line = 3;
+    app.update_highlight();
+
+    // Reparsing the same input should not move a still-valid selection
+    app.parse_input();
+    assert_eq!(app.selected_line, 3);
+    assert!(app.highlighted_bytes.is_some());
+}
+
+// Search tests
+
+#[test]
+fn test_search_matches_empty_query() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    assert!(app.search_matches().is_empty());
+}
+
+#[test]
+fn test_search_matches_case_insensitive() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+
+    app.search_query = "VERSION".to_string();
+    let upper = app.search_matches();
+    app.search_query = "version".to_string();
+    let lower = app.search_matches();
+
+    assert!(!lower.is_empty());
+    assert_eq!(upper, lower);
+}
+
+#[test]
+fn test_search_matches_no_hits() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.search_query = "zzzz-no-such-field".to_string();
+    assert!(app.search_matches().is_empty());
+}
+
+#[test]
+fn test_jump_to_match_no_matches_is_noop() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.selected_line = 2;
+    app.search_query = "zzzz-no-such-field".to_string();
+
+    app.jump_to_match(true, 20);
+    assert_eq!(app.selected_line, 2);
+    app.jump_to_first_match(20);
+    assert_eq!(app.selected_line, 2);
+}
+
+#[test]
+fn test_jump_to_first_match_prefers_at_or_after() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    app.search_query = "version".to_string();
+
+    let matches = app.search_matches();
+    assert!(matches.len() >= 2);
+
+    // From before the second match, land on the second match
+    app.selected_line = matches[0] + 1;
+    app.jump_to_first_match(20);
+    assert_eq!(app.selected_line, matches[1]);
+
+    // From past the last match, wrap to the first
+    app.selected_line = *matches.last().unwrap() + 1;
+    app.jump_to_first_match(20);
+    assert_eq!(app.selected_line, matches[0]);
+}
+
+#[test]
+fn test_select_line_scrolls_into_view() {
+    let mut app = App::new();
+    app.input = TEST_KEY.to_string();
+    app.parse_input();
+    let total = app.get_all_fields().len();
+    assert!(total > 5);
+
+    // Jump far down with a small window: view scrolls to contain selection
+    app.select_line(total - 1, 5);
+    assert_eq!(app.selected_line, total - 1);
+    assert_eq!(app.data_scroll, total - 5);
+    assert!(app.highlighted_bytes.is_some());
+
+    // Jump back up: scroll follows
+    app.select_line(0, 5);
+    assert_eq!(app.selected_line, 0);
+    assert_eq!(app.data_scroll, 0);
+
+    // Out-of-range line clamps to the last field
+    app.select_line(usize::MAX, 5);
+    assert_eq!(app.selected_line, total - 1);
+}
+
+#[test]
+fn test_select_line_empty_noop() {
+    let mut app = App::new();
+    app.select_line(3, 5);
+    assert_eq!(app.selected_line, 0);
+}

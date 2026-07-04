@@ -33,8 +33,22 @@ impl Widget for DataPanel<'_> {
             Color::DarkGray
         };
 
+        let matches = self.app.search_matches();
+        let title = if self.app.search_active {
+            format!(" Decoded Data — /{}█ ", self.app.search_query)
+        } else if !self.app.search_query.is_empty() {
+            format!(
+                " Decoded Data — /{} ({} match{}) ",
+                self.app.search_query,
+                matches.len(),
+                if matches.len() == 1 { "" } else { "es" }
+            )
+        } else {
+            " Decoded Data ".to_string()
+        };
+
         let block = Block::default()
-            .title(" Decoded Data ")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color));
 
@@ -71,7 +85,9 @@ impl Widget for DataPanel<'_> {
                 None => Color::White, // Headers are white
             };
 
-            let name_style = if is_selected {
+            let is_match = matches.contains(&field_idx);
+
+            let mut name_style = if is_selected {
                 Style::default()
                     .fg(Color::Black)
                     .bg(color)
@@ -79,6 +95,9 @@ impl Widget for DataPanel<'_> {
             } else {
                 Style::default().fg(color)
             };
+            if is_match {
+                name_style = name_style.add_modifier(Modifier::UNDERLINED);
+            }
 
             let value_style = if is_selected {
                 Style::default().fg(Color::Black).bg(Color::DarkGray)

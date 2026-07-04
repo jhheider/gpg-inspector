@@ -47,9 +47,12 @@ impl Widget for InputPanel<'_> {
         block.render(area, buf);
 
         if self.app.input.is_empty() {
-            let placeholder = Paragraph::new("Paste armored GPG data here...")
-                .style(Style::default().fg(Color::DarkGray))
-                .wrap(Wrap { trim: false });
+            let placeholder = Paragraph::new(
+                "Paste armored GPG data here...\n\n\
+                 Tab: switch panels   F1: help   Ctrl+Q: quit",
+            )
+            .style(Style::default().fg(Color::DarkGray))
+            .wrap(Wrap { trim: false });
             placeholder.render(inner, buf);
         } else {
             let text = &self.app.input;

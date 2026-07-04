@@ -14,7 +14,9 @@ Inspired by [ConradIrwin/gpg-decoder](https://github.com/ConradIrwin/gpg-decoder
 - Interactive TUI with synchronized hex view and packet display
 - Real-time parsing as you type or paste armored GPG data
 - Color-coded byte visualization linking fields to raw bytes
-- Support for both old (3.x) and new (4.x) OpenPGP packet formats
+- Field search (`/`) and full-value detail view (`Enter`)
+- Old and new OpenPGP packet formats, packet versions v3 through v6 (RFC 4880 and RFC 9580)
+- Scriptable text and JSON output modes (`--txt`, `--json`)
 - CRC24 checksum validation for armored input
 
 ## Installation
@@ -61,6 +63,10 @@ gpg --export --armor KEY_ID | gpg-inspector
 
 # Pipe from file
 cat message.asc | gpg-inspector
+
+# Non-interactive output for scripting
+gpg-inspector -f key.asc --json | jq '.packets[].tag'
+gpg-inspector -f key.asc --txt
 ```
 
 ### Options
@@ -68,8 +74,14 @@ cat message.asc | gpg-inspector
 | Option | Description |
 |--------|-------------|
 | `-f`, `--file FILE` | Load GPG data from a file |
+| `--txt` | Print parsed packets as formatted text (with hex dump) and exit |
+| `--json` | Print parsed packets as JSON and exit |
 | `--version` | Show version |
 | `--help` | Show help |
+
+`--json` is available in the default build. If you build with
+`--no-default-features` (minimal TUI-only binary), re-enable it with
+`--features serde`.
 
 ## Keyboard Controls
 
@@ -78,8 +90,8 @@ cat message.asc | gpg-inspector
 | Key | Action |
 |-----|--------|
 | `Tab` / `Shift+Tab` | Switch between Input and Data panels |
+| `F1` | Toggle help overlay |
 | `Ctrl+C` / `Ctrl+Q` | Quit |
-| `Esc` | Quit |
 
 ### Input Panel
 
@@ -102,17 +114,33 @@ cat message.asc | gpg-inspector
 | `Down` / `j` | Move selection down |
 | `Page Up` / `Page Down` | Move selection by page |
 | `Home` / `End` | Jump to first/last field |
+| `Enter` | Show full details for the selected field |
+| `/` | Search fields by name or value (`Enter` jumps, `Esc` cancels) |
+| `n` / `N` | Jump to next / previous search match |
+| `?` | Toggle help overlay |
 
 Selecting a field in the Data panel highlights the corresponding bytes in the hex view.
 
 ## Supported Packet Types
 
-- Public Key / Public Subkey
-- Secret Key / Secret Subkey
-- User ID
-- Signature (v3, v4)
+Every exportable packet type defined by RFC 4880 and RFC 9580 is parsed (see
+[RFC4880_COMPLIANCE.md](RFC4880_COMPLIANCE.md) and
+[RFC9580_COMPLIANCE.md](RFC9580_COMPLIANCE.md) for the full compliance tables):
+
+- Public Key / Public Subkey and Secret Key / Secret Subkey (v3–v6)
+- Signature (v3, v4, v5, v6) with all subpacket types
+- One-Pass Signature
 - Public Key Encrypted Session Key (PKESK)
-- Symmetrically Encrypted Integrity Protected Data (SEIPD)
+- Symmetric-Key Encrypted Session Key (SKESK)
+- Symmetrically Encrypted Data (legacy) and SEIPD v1/v2
+- AEAD Encrypted Data and Padding (RFC 9580)
+- Literal Data, Compressed Data, Marker
+- User ID and User Attribute
+- Modification Detection Code (MDC)
+- Private/Experimental (tags 60–63)
+
+Trust packets (tag 12) are intentionally not parsed—they are
+implementation-specific and never exported.
 
 ### Supported Algorithms
 
