@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "A TUI for parsing and inspecting OpenPGP (GPG) packets according to RFC 4880 and RFC 9580"
+readme = "../README.md"
 
 [features]
 default = ["serde"]
@@ -13,7 +18,7 @@ serde = ["dep:serde", "dep:serde_json", "dep:hex"]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
 
 [dependencies]
-gpg-inspector-lib = { path = "../gpg-inspector-lib" }
+gpg-inspector-lib = { version = "0.8.0", path = "../gpg-inspector-lib" }
 ratatui = "0.30"
 crossterm = { version = "0.29", features = ["use-dev-tty"] }
 anyhow = "1.0.102"
