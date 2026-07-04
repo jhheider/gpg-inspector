@@ -148,13 +148,14 @@ fn parse_v4_signature(
     })
 }
 
-/// Parses a V6 signature packet body (RFC 9580).
+/// Parses a V6 signature packet body (RFC 9580 §5.2.3).
 ///
 /// V6 signatures have:
 /// - Signature type, pub algorithm, hash algorithm (same as V4)
-/// - Salt (16-32 bytes depending on hash algorithm)
 /// - 4-byte hashed subpacket length (vs 2-byte in V4)
 /// - 4-byte unhashed subpacket length (vs 2-byte in V4)
+/// - After the hash prefix: a one-octet salt size followed by the salt
+///   (16-32 bytes; the size is fixed per hash algorithm)
 fn parse_v6_signature(
     stream: &mut ByteStream,
     version: u8,
@@ -189,17 +190,6 @@ fn parse_v6_signature(
         "Hash Algorithm",
         hash_algo_info.display(),
         (hash_algo_start, hash_algo_end),
-    ));
-
-    // V6: Salt field (length depends on hash algorithm)
-    let salt_len = get_v6_signature_salt_len(hash_algorithm);
-    let salt_start = offset + stream.pos();
-    let _salt = stream.bytes(salt_len)?;
-    let salt_end = offset + stream.pos();
-    fields.push(Field::field(
-        "Salt",
-        format!("{} bytes", salt_len),
-        (salt_start, salt_end),
     ));
 
     // V6: 4-byte hashed subpacket length
@@ -242,6 +232,20 @@ fn parse_v6_signature(
         format!("{:02X}{:02X}", hash_prefix[0], hash_prefix[1]),
         (prefix_start, prefix_end),
     ));
+
+    // V6: one-octet salt size, then the salt (RFC 9580 fixes the size
+    // per hash algorithm; flag any mismatch but keep parsing)
+    let salt_start = offset + stream.pos();
+    let salt_len = stream.octet()? as usize;
+    let _salt = stream.bytes(salt_len)?;
+    let salt_end = offset + stream.pos();
+    let expected_len = get_v6_signature_salt_len(hash_algorithm);
+    let salt_desc = if salt_len == expected_len {
+        format!("{} bytes", salt_len)
+    } else {
+        format!("{} bytes (expected {})", salt_len, expected_len)
+    };
+    fields.push(Field::field("Salt", salt_desc, (salt_start, salt_end)));
 
     let sig_start = offset + stream.pos();
     let signature = parse_signature_data(stream, pub_algorithm)?;

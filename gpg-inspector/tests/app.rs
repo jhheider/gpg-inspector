@@ -551,3 +551,153 @@ fn test_select_line_empty_noop() {
     app.select_line(3, 5);
     assert_eq!(app.selected_line, 0);
 }
+
+// Binary input tests
+
+const TEST_KEY_BIN: &[u8] = include_bytes!("../../fixtures/test.key.gpg");
+const TEST_COMPRESSED: &[u8] = include_bytes!("../../fixtures/test.compressed.gpg");
+const TEST_CLEARTEXT: &str = include_str!("../../fixtures/test.cleartext.asc");
+
+#[test]
+fn test_load_binary_parses_and_focuses_data() {
+    use gpg_inspector::app::InputSource;
+
+    let mut app = App::new();
+    app.load_binary(TEST_KEY_BIN.to_vec(), "test.key.gpg");
+
+    assert!(app.is_binary());
+    assert_eq!(
+        app.source,
+        InputSource::Binary {
+            origin: "test.key.gpg".to_string(),
+            len: TEST_KEY_BIN.len()
+        }
+    );
+    assert!(!app.packets.is_empty());
+    assert!(app.error_message.is_none());
+    assert_eq!(app.focus, PanelFocus::Data);
+    assert_eq!(app.raw_bytes.len(), TEST_KEY_BIN.len());
+}
+
+#[test]
+fn test_load_binary_invalid_reports_error() {
+    let mut app = App::new();
+    // Truncated packet: declares a 32-byte body but provides 1 byte
+    app.load_binary(vec![0xC6, 0x20, 0x01], "junk");
+    assert!(app.is_binary());
+    assert!(app.error_message.is_some());
+    assert!(app.packets.is_empty());
+}
+
+#[test]
+fn test_binary_mode_is_read_only() {
+    let mut app = App::new();
+    app.load_binary(TEST_KEY_BIN.to_vec(), "test.key.gpg");
+    let packet_count = app.packets.len();
+
+    app.insert_char('x');
+    app.paste_text("garbage");
+    app.delete_char();
+    app.delete_char_forward();
+
+    assert!(app.input.is_empty());
+    assert!(app.is_binary());
+    assert_eq!(app.packets.len(), packet_count);
+}
+
+#[test]
+fn test_binary_mode_clear_input_resets_to_text() {
+    let mut app = App::new();
+    app.load_binary(TEST_KEY_BIN.to_vec(), "test.key.gpg");
+
+    app.clear_input();
+    assert!(!app.is_binary());
+    assert!(app.packets.is_empty());
+
+    // Editing works again
+    app.insert_char('a');
+    assert_eq!(app.input, "a");
+}
+
+// Multi-block and cleartext state tests
+
+#[test]
+fn test_parse_input_multi_block_state() {
+    let mut app = App::new();
+    app.input = format!("{}\n{}", TEST_KEY, TEST_KEY);
+    app.parse_input();
+
+    assert_eq!(app.armor_blocks.len(), 2);
+    assert!(app.cleartext.is_none());
+    assert!(app.error_message.is_none());
+}
+
+#[test]
+fn test_parse_input_cleartext_state() {
+    let mut app = App::new();
+    app.input = TEST_CLEARTEXT.to_string();
+    app.parse_input();
+
+    assert!(app.cleartext.is_some());
+    assert_eq!(app.armor_blocks.len(), 1);
+    assert!(app.error_message.is_none());
+
+    // Clearing resets the armor state
+    app.clear_input();
+    assert!(app.cleartext.is_none());
+    assert!(app.armor_blocks.is_empty());
+}
+
+// Nested (decompressed) field tests
+
+#[test]
+fn test_nested_fields_flattened_and_flagged() {
+    let mut app = App::new();
+    app.load_binary(TEST_COMPRESSED.to_vec(), "compressed");
+
+    let flagged = app.get_all_fields_flagged();
+    assert!(flagged.iter().any(|&(_, child)| child), "no child fields");
+    assert!(flagged.iter().any(|&(_, child)| !child));
+
+    // Child fields appear in the plain flatten too
+    assert_eq!(app.get_all_fields().len(), flagged.len());
+
+    // The nested Literal Data packet header is present
+    assert!(
+        flagged
+            .iter()
+            .any(|&(f, child)| child && f.name.contains("Literal Data"))
+    );
+}
+
+#[test]
+fn test_nested_fields_get_no_color_or_highlight() {
+    let mut app = App::new();
+    app.load_binary(TEST_COMPRESSED.to_vec(), "compressed");
+
+    let (child_field_idx, top_idx) = {
+        let flagged = app.get_all_fields_flagged();
+        (
+            flagged
+                .iter()
+                .position(|&(f, child)| child && f.indent > 0)
+                .expect("no non-header child field"),
+            flagged
+                .iter()
+                .position(|&(f, child)| !child && f.indent > 0)
+                .unwrap(),
+        )
+    };
+
+    assert_eq!(app.get_field_color(child_field_idx), None);
+
+    app.selected_line = child_field_idx;
+    app.update_highlight();
+    assert!(app.highlighted_bytes.is_none());
+
+    // A top-level non-header field still gets both
+    assert!(app.get_field_color(top_idx).is_some());
+    app.selected_line = top_idx;
+    app.update_highlight();
+    assert!(app.highlighted_bytes.is_some());
+}

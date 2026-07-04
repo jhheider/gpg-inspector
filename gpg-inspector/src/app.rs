@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use gpg_inspector_lib::{Field, Packet};
+use gpg_inspector_lib::{ArmorBlock, Field, Packet};
 
 use crate::ui::colors::ColorTracker;
 
@@ -8,6 +8,14 @@ use crate::ui::colors::ColorTracker;
 pub enum PanelFocus {
     Input,
     Data,
+}
+
+/// Where the current data came from. Binary input is read-only: the
+/// input panel is a text editor and cannot represent raw bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputSource {
+    Text,
+    Binary { origin: String, len: usize },
 }
 
 impl PanelFocus {
@@ -22,8 +30,11 @@ impl PanelFocus {
 pub struct App {
     pub input: String,
     pub cursor_pos: usize,
+    pub source: InputSource,
     pub packets: Vec<Packet>,
     pub raw_bytes: Arc<[u8]>,
+    pub armor_blocks: Vec<ArmorBlock>,
+    pub cleartext: Option<Arc<str>>,
     pub color_tracker: ColorTracker,
     pub focus: PanelFocus,
     pub hex_scroll: usize,
@@ -43,8 +54,11 @@ impl App {
         Self {
             input: String::new(),
             cursor_pos: 0,
+            source: InputSource::Text,
             packets: Vec::new(),
             raw_bytes: Arc::from([]),
+            armor_blocks: Vec::new(),
+            cleartext: None,
             color_tracker: ColorTracker::default(),
             focus: PanelFocus::Input,
             hex_scroll: 0,
@@ -60,19 +74,62 @@ impl App {
         }
     }
 
+    pub fn is_binary(&self) -> bool {
+        matches!(self.source, InputSource::Binary { .. })
+    }
+
+    /// Loads raw binary PGP data (read-only mode); parses once.
+    pub fn load_binary(&mut self, bytes: Vec<u8>, origin: impl Into<String>) {
+        let bytes: Arc<[u8]> = bytes.into();
+        self.source = InputSource::Binary {
+            origin: origin.into(),
+            len: bytes.len(),
+        };
+        self.input.clear();
+        self.cursor_pos = 0;
+        self.raw_bytes = Arc::clone(&bytes);
+        self.armor_blocks = Vec::new();
+        self.cleartext = None;
+
+        match gpg_inspector_lib::parse_bytes(bytes) {
+            Ok(packets) => {
+                self.color_tracker =
+                    ColorTracker::compute_from_packets(&packets, self.raw_bytes.len());
+                self.packets = packets;
+                self.error_message = None;
+            }
+            Err(e) => {
+                self.packets.clear();
+                self.color_tracker = ColorTracker::default();
+                self.error_message = Some(format!("Parse error: {}", e));
+            }
+        }
+        self.clamp_selection();
+        self.focus = PanelFocus::Data;
+    }
+
     pub fn parse_input(&mut self) {
+        // Binary input is parsed once at load and never edited
+        if self.is_binary() {
+            return;
+        }
+
         if self.input.trim().is_empty() {
             self.packets.clear();
             self.raw_bytes = Arc::from([]);
+            self.armor_blocks = Vec::new();
+            self.cleartext = None;
             self.color_tracker = ColorTracker::default();
             self.error_message = None;
             self.clamp_selection();
             return;
         }
 
-        match gpg_inspector_lib::decode_armor(&self.input) {
+        match gpg_inspector_lib::decode_armor_multi(&self.input) {
             Ok(armor_result) => {
                 self.raw_bytes = Arc::clone(&armor_result.bytes);
+                self.armor_blocks = armor_result.blocks;
+                self.cleartext = armor_result.cleartext;
                 match gpg_inspector_lib::parse_bytes(armor_result.bytes) {
                     Ok(packets) => {
                         // Compute colors from field spans
@@ -91,6 +148,8 @@ impl App {
             Err(e) => {
                 self.packets.clear();
                 self.raw_bytes = Arc::from([]);
+                self.armor_blocks = Vec::new();
+                self.cleartext = None;
                 self.color_tracker = ColorTracker::default();
                 self.error_message = Some(format!("Armor error: {}", e));
             }
@@ -109,12 +168,29 @@ impl App {
     }
 
     pub fn get_all_fields(&self) -> Vec<&Field> {
-        let mut fields = Vec::new();
-        for packet in &self.packets {
-            for field in &packet.fields {
-                fields.push(field);
+        self.get_all_fields_flagged()
+            .into_iter()
+            .map(|(field, _)| field)
+            .collect()
+    }
+
+    /// Flattens all packets' fields, including nested (decompressed)
+    /// packets' fields, flagging the nested ones. Nested fields' spans
+    /// index their packet's decompressed buffer, not `raw_bytes`, so
+    /// they are excluded from hex highlighting and coloring until the
+    /// hex view can switch buffers.
+    pub fn get_all_fields_flagged(&self) -> Vec<(&Field, bool)> {
+        fn walk<'a>(packets: &'a [Packet], is_child: bool, out: &mut Vec<(&'a Field, bool)>) {
+            for packet in packets {
+                for field in &packet.fields {
+                    out.push((field, is_child));
+                }
+                walk(&packet.children, true, out);
             }
         }
+
+        let mut fields = Vec::new();
+        walk(&self.packets, false, &mut fields);
         fields
     }
 
@@ -123,25 +199,29 @@ impl App {
     }
 
     /// Returns the color index for a field based on its position.
-    /// Fields with indent == 0 (packet headers) get no color.
+    /// Fields with indent == 0 (packet headers) get no color, and
+    /// neither do nested (decompressed) fields — their bytes are not in
+    /// `raw_bytes`, so coloring them would desynchronize from the hex view.
     pub fn get_field_color(&self, field_index: usize) -> Option<u8> {
-        let fields = self.get_all_fields();
+        let fields = self.get_all_fields_flagged();
         if field_index >= fields.len() {
             return None;
         }
 
-        let field = fields[field_index];
-        if field.indent == 0 {
+        let (field, is_child) = fields[field_index];
+        if field.indent == 0 || is_child {
             return None;
         }
 
-        // Count non-header fields before this one
+        // Count top-level non-header fields before this one; must match
+        // ColorTracker::compute_from_packets, which only sees top-level
+        // packets' fields.
         let mut color_index: u8 = 0;
-        for (i, f) in fields.iter().enumerate() {
+        for (i, &(f, child)) in fields.iter().enumerate() {
             if i == field_index {
                 return Some(color_index);
             }
-            if f.indent > 0 {
+            if !child && f.indent > 0 {
                 color_index = (color_index + 1) % 12;
             }
         }
@@ -156,10 +236,16 @@ impl App {
     }
 
     pub fn update_highlight(&mut self) {
-        let fields = self.get_all_fields();
+        let fields = self.get_all_fields_flagged();
         if self.selected_line < fields.len() {
-            let field = fields[self.selected_line];
-            self.highlighted_bytes = Some(self.get_field_span(field));
+            let (field, is_child) = fields[self.selected_line];
+            // Nested fields' spans index the decompressed buffer, not
+            // raw_bytes; highlighting them would mark the wrong bytes
+            self.highlighted_bytes = if is_child {
+                None
+            } else {
+                Some(self.get_field_span(field))
+            };
         } else {
             self.highlighted_bytes = None;
         }
@@ -269,12 +355,18 @@ impl App {
     }
 
     pub fn insert_char(&mut self, c: char) {
+        if self.is_binary() {
+            return;
+        }
         self.input.insert(self.cursor_pos, c);
         self.cursor_pos += c.len_utf8();
         self.parse_input();
     }
 
     pub fn delete_char(&mut self) {
+        if self.is_binary() {
+            return;
+        }
         if self.cursor_pos > 0 {
             let prev_char_boundary = self.input[..self.cursor_pos]
                 .char_indices()
@@ -288,6 +380,9 @@ impl App {
     }
 
     pub fn delete_char_forward(&mut self) {
+        if self.is_binary() {
+            return;
+        }
         if self.cursor_pos < self.input.len() {
             self.input.remove(self.cursor_pos);
             self.parse_input();
@@ -323,12 +418,18 @@ impl App {
     }
 
     pub fn paste_text(&mut self, text: &str) {
+        if self.is_binary() {
+            return;
+        }
         self.input.insert_str(self.cursor_pos, text);
         self.cursor_pos += text.len();
         self.parse_input();
     }
 
+    /// Clears the input. Also exits read-only binary mode, returning to
+    /// an empty editable text buffer.
     pub fn clear_input(&mut self) {
+        self.source = InputSource::Text;
         self.input.clear();
         self.cursor_pos = 0;
         self.parse_input();

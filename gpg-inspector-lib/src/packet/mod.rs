@@ -15,6 +15,8 @@
 
 /// Compressed Data packet parsing.
 pub mod compressed_data;
+/// Key fingerprint and key ID derivation.
+pub mod fingerprint;
 /// Literal Data packet parsing.
 pub mod literal_data;
 /// Modification Detection Code packet parsing.
@@ -141,6 +143,33 @@ pub struct Packet {
     pub body: PacketBody,
     /// Parsed fields for display.
     pub fields: Vec<Field>,
+    /// Nested packets parsed from this packet's decompressed payload
+    /// (Compressed Data packets only). Their spans index
+    /// [`Packet::child_buffer`], not the original data.
+    pub children: Vec<Packet>,
+    /// The decompressed buffer that `children` spans index into.
+    pub child_buffer: Option<Arc<[u8]>>,
+}
+
+impl Packet {
+    /// Creates a packet with no nested children.
+    pub fn new(
+        start: usize,
+        end: usize,
+        tag: PacketTag,
+        body: PacketBody,
+        fields: Vec<Field>,
+    ) -> Self {
+        Self {
+            start,
+            end,
+            tag,
+            body,
+            fields,
+            children: Vec::new(),
+            child_buffer: None,
+        }
+    }
 }
 
 /// The typed body of a parsed packet.
@@ -198,18 +227,26 @@ pub enum PacketBody {
 ///
 /// Returns an error if any packet has an invalid structure.
 pub fn parse_packets(bytes: Arc<[u8]>) -> Result<Vec<Packet>> {
+    parse_packets_at_depth(bytes, 0)
+}
+
+/// Maximum nesting depth for recursive (compressed) packet expansion.
+#[cfg(feature = "decompress")]
+const MAX_DEPTH: usize = 4;
+
+fn parse_packets_at_depth(bytes: Arc<[u8]>, depth: usize) -> Result<Vec<Packet>> {
     let mut stream = ByteStream::from_arc(bytes);
     let mut packets = Vec::new();
 
     while !stream.is_empty() {
-        let packet = parse_packet(&mut stream)?;
+        let packet = parse_packet(&mut stream, depth)?;
         packets.push(packet);
     }
 
     Ok(packets)
 }
 
-fn parse_packet(stream: &mut ByteStream) -> Result<Packet> {
+fn parse_packet(stream: &mut ByteStream, depth: usize) -> Result<Packet> {
     let packet_start = stream.abs_pos();
     let mut fields = Vec::new();
 
@@ -247,13 +284,89 @@ fn parse_packet(stream: &mut ByteStream) -> Result<Packet> {
 
     let body = parse_packet_body(tag, &mut body_stream, &mut fields, body_start)?;
 
+    let mut children = Vec::new();
+    let mut child_buffer = None;
+    if let PacketBody::CompressedData(ref cd) = body {
+        expand_compressed(
+            cd,
+            depth,
+            &mut fields,
+            &mut children,
+            &mut child_buffer,
+            (body_start, packet_end),
+        );
+    }
+
     Ok(Packet {
         start: packet_start,
         end: packet_end,
         tag,
         body,
         fields,
+        children,
+        child_buffer,
     })
+}
+
+/// Decompresses a Compressed Data packet and parses the nested packets.
+///
+/// Never fails the surrounding parse: any decompression or nested-parse
+/// problem is reported as a "Decompressed" field instead.
+#[cfg(feature = "decompress")]
+fn expand_compressed(
+    cd: &compressed_data::CompressedDataPacket,
+    depth: usize,
+    fields: &mut Vec<Field>,
+    children: &mut Vec<Packet>,
+    child_buffer: &mut Option<Arc<[u8]>>,
+    span: (usize, usize),
+) {
+    if depth >= MAX_DEPTH {
+        fields.push(Field::field(
+            "Decompressed",
+            "max nesting depth reached; not expanded",
+            span,
+        ));
+        return;
+    }
+
+    match compressed_data::decompress(cd.algorithm, &cd.compressed_data) {
+        Ok(buf) => {
+            let buf: Arc<[u8]> = buf.into();
+            match parse_packets_at_depth(Arc::clone(&buf), depth + 1) {
+                Ok(packets) => {
+                    fields.push(Field::field(
+                        "Decompressed",
+                        format!("{} bytes, {} packets", buf.len(), packets.len()),
+                        span,
+                    ));
+                    *children = packets;
+                    *child_buffer = Some(buf);
+                }
+                Err(e) => {
+                    fields.push(Field::field("Decompressed", format!("error: {}", e), span));
+                }
+            }
+        }
+        Err(msg) => {
+            fields.push(Field::field(
+                "Decompressed",
+                format!("error: {}", msg),
+                span,
+            ));
+        }
+    }
+}
+
+#[cfg(not(feature = "decompress"))]
+fn expand_compressed(
+    _cd: &compressed_data::CompressedDataPacket,
+    _depth: usize,
+    _fields: &mut Vec<Field>,
+    _children: &mut Vec<Packet>,
+    _child_buffer: &mut Option<Arc<[u8]>>,
+    _span: (usize, usize),
+) {
 }
 
 fn parse_new_length(stream: &mut ByteStream) -> Result<usize> {

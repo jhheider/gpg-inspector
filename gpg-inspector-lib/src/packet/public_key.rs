@@ -6,6 +6,7 @@
 use crate::error::{Error, Result};
 use crate::lookup::{lookup_curve_oid, lookup_public_key_algorithm};
 use crate::packet::Field;
+use crate::packet::fingerprint::{key_id, to_hex, v4_fingerprint, v6_fingerprint};
 use crate::stream::ByteStream;
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -124,6 +125,7 @@ pub fn parse_public_key(
     fields: &mut Vec<Field>,
     offset: usize,
 ) -> Result<PublicKeyPacket> {
+    let body_start = stream.pos();
     let version_start = offset + stream.pos();
     let version = stream.octet()?;
     let version_end = offset + stream.pos();
@@ -133,10 +135,46 @@ pub fn parse_public_key(
         (version_start, version_end),
     ));
 
-    match version {
+    let packet = match version {
         6 => parse_public_key_v6(stream, version, fields, offset),
         _ => parse_public_key_v4(stream, version, fields, offset),
-    }
+    }?;
+
+    push_identity_fields(stream, body_start, version, fields, offset);
+    Ok(packet)
+}
+
+/// Appends computed fingerprint and key ID fields for V4 and V6 keys.
+///
+/// The hashed region is the public key body (version octet through key
+/// material), i.e. `stream` bytes `body_start..pos()` — for secret keys
+/// this is called before any S2K/secret material is read, so the same
+/// region applies. V3 (MD5) keys and unknown versions get no fields.
+/// The fields' span is the hashed region, and their names carry a
+/// "(computed)" marker since the values are derived, not on the wire.
+fn push_identity_fields(
+    stream: &ByteStream,
+    body_start: usize,
+    version: u8,
+    fields: &mut Vec<Field>,
+    offset: usize,
+) {
+    let body = &stream.all_bytes()[body_start..stream.pos()];
+    let span = (offset + body_start, offset + stream.pos());
+
+    let fingerprint: Vec<u8> = match version {
+        4 => v4_fingerprint(body).to_vec(),
+        6 => v6_fingerprint(body).to_vec(),
+        _ => return,
+    };
+    let id = key_id(version, &fingerprint);
+
+    fields.push(Field::field(
+        "Fingerprint (computed)",
+        to_hex(&fingerprint),
+        span,
+    ));
+    fields.push(Field::field("Key ID (computed)", id, span));
 }
 
 /// Parses a V4 public key packet body.

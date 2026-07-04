@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
 
-use crate::app::{App, PanelFocus};
+use crate::app::{App, InputSource, PanelFocus};
 
 pub struct InputPanel<'a> {
     app: &'a App,
@@ -34,6 +34,12 @@ impl Widget for InputPanel<'_> {
 
         let title = if let Some(ref err) = self.app.error_message {
             format!(" Input - {} ", err)
+        } else if self.app.is_binary() {
+            " Input (binary, read-only) ".to_string()
+        } else if self.app.cleartext.is_some() {
+            " Input — cleartext signed message ".to_string()
+        } else if self.app.armor_blocks.len() > 1 {
+            format!(" Input — {} armor blocks ", self.app.armor_blocks.len())
         } else {
             " Input (paste GPG armored text) ".to_string()
         };
@@ -46,7 +52,22 @@ impl Widget for InputPanel<'_> {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        if self.app.input.is_empty() {
+        if let InputSource::Binary { ref origin, len } = self.app.source {
+            let summary = format!(
+                "Binary input (read-only)\n\n\
+                 Source:  {}\n\
+                 Size:    {} bytes\n\
+                 Packets: {}\n\n\
+                 Ctrl+K: clear and switch to text input",
+                origin,
+                len,
+                self.app.packets.len()
+            );
+            Paragraph::new(summary)
+                .style(Style::default().fg(Color::Gray))
+                .wrap(Wrap { trim: false })
+                .render(inner, buf);
+        } else if self.app.input.is_empty() {
             let placeholder = Paragraph::new(
                 "Paste armored GPG data here...\n\n\
                  Tab: switch panels   F1: help   Ctrl+Q: quit",

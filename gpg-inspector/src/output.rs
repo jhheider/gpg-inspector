@@ -22,54 +22,7 @@ pub fn output_txt(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
     let mut field_color_index: u8 = 0;
 
     for packet in packets {
-        if use_color {
-            output.push_str(&format!(
-                "{}=== {} Packet [0x{:04X}-0x{:04X}] ==={}\n",
-                BOLD, packet.tag, packet.start, packet.end, RESET
-            ));
-        } else {
-            output.push_str(&format!(
-                "=== {} Packet [0x{:04X}-0x{:04X}] ===\n",
-                packet.tag, packet.start, packet.end
-            ));
-        }
-
-        // Skip the first field (packet header) as it's represented in the header line
-        for field in packet.fields.iter().skip(1) {
-            let indent = "  ".repeat(field.indent as usize);
-
-            // Get color for this field (only non-header fields get colors)
-            let field_color = if field.indent > 0 {
-                let c = field_color_index;
-                field_color_index = (field_color_index + 1) % 12;
-                Some(c)
-            } else {
-                None
-            };
-
-            if use_color {
-                let color = field_color.map(palette_color).unwrap_or_default();
-                output.push_str(&format!(
-                    "{}{}{}: {}{} {}[0x{:04X}-0x{:04X}]{}\n",
-                    indent,
-                    color,
-                    field.name,
-                    field.value,
-                    RESET,
-                    DIM,
-                    field.span.0,
-                    field.span.1,
-                    RESET
-                ));
-            } else {
-                output.push_str(&format!(
-                    "{}{}: {} [0x{:04X}-0x{:04X}]\n",
-                    indent, field.name, field.value, field.span.0, field.span.1
-                ));
-            }
-        }
-
-        output.push('\n');
+        render_packet_txt(packet, 0, &mut field_color_index, use_color, &mut output);
     }
 
     if use_color {
@@ -79,7 +32,108 @@ pub fn output_txt(packets: &[Packet], bytes: &[u8], use_color: bool) -> String {
     }
     output.push_str(&format_hex_dump(&color_tracker, bytes, use_color));
 
+    append_decompressed_dumps(packets, use_color, &mut output, "");
+
     output
+}
+
+/// Renders one packet's header and fields, then recurses into nested
+/// (decompressed) packets with extra indentation. Nested packets get a
+/// fresh color rotation matching their own buffer's hex dump.
+fn render_packet_txt(
+    packet: &Packet,
+    depth: usize,
+    field_color_index: &mut u8,
+    use_color: bool,
+    output: &mut String,
+) {
+    let pad = "  ".repeat(depth);
+    let marker = if depth > 0 { " (decompressed)" } else { "" };
+
+    if use_color {
+        output.push_str(&format!(
+            "{}{}=== {} Packet [0x{:04X}-0x{:04X}]{} ==={}\n",
+            pad, BOLD, packet.tag, packet.start, packet.end, marker, RESET
+        ));
+    } else {
+        output.push_str(&format!(
+            "{}=== {} Packet [0x{:04X}-0x{:04X}]{} ===\n",
+            pad, packet.tag, packet.start, packet.end, marker
+        ));
+    }
+
+    // Skip the first field (packet header) as it's represented in the header line
+    for field in packet.fields.iter().skip(1) {
+        let indent = format!("{}{}", pad, "  ".repeat(field.indent as usize));
+
+        // Get color for this field (only non-header fields get colors)
+        let field_color = if field.indent > 0 {
+            let c = *field_color_index;
+            *field_color_index = (*field_color_index + 1) % 12;
+            Some(c)
+        } else {
+            None
+        };
+
+        if use_color {
+            let color = field_color.map(palette_color).unwrap_or_default();
+            output.push_str(&format!(
+                "{}{}{}: {}{} {}[0x{:04X}-0x{:04X}]{}\n",
+                indent,
+                color,
+                field.name,
+                field.value,
+                RESET,
+                DIM,
+                field.span.0,
+                field.span.1,
+                RESET
+            ));
+        } else {
+            output.push_str(&format!(
+                "{}{}: {} [0x{:04X}-0x{:04X}]\n",
+                indent, field.name, field.value, field.span.0, field.span.1
+            ));
+        }
+    }
+
+    output.push('\n');
+
+    if !packet.children.is_empty() {
+        // Fresh rotation per decompressed buffer, matching its hex dump
+        let mut child_color_index: u8 = 0;
+        for child in &packet.children {
+            render_packet_txt(child, depth + 1, &mut child_color_index, use_color, output);
+        }
+    }
+}
+
+/// Appends a hex dump for every decompressed buffer, labeled by the
+/// (1-based, dot-separated) position of its Compressed Data packet.
+fn append_decompressed_dumps(packets: &[Packet], use_color: bool, output: &mut String, path: &str) {
+    for (i, packet) in packets.iter().enumerate() {
+        if let Some(ref buf) = packet.child_buffer {
+            let label = if path.is_empty() {
+                format!("{}", i + 1)
+            } else {
+                format!("{}.{}", path, i + 1)
+            };
+            if use_color {
+                output.push_str(&format!(
+                    "\n{}--- Decompressed Hex Dump (packet {}) ---{}\n",
+                    BOLD, label, RESET
+                ));
+            } else {
+                output.push_str(&format!(
+                    "\n--- Decompressed Hex Dump (packet {}) ---\n",
+                    label
+                ));
+            }
+            let tracker = ColorTracker::compute_from_packets(&packet.children, buf.len());
+            output.push_str(&format_hex_dump(&tracker, buf, use_color));
+            append_decompressed_dumps(&packet.children, use_color, output, &label);
+        }
+    }
 }
 
 fn format_hex_dump(color_tracker: &ColorTracker, bytes: &[u8], use_color: bool) -> String {
@@ -177,13 +231,29 @@ fn format_hex_dump(color_tracker: &ColorTracker, bytes: &[u8], use_color: bool) 
 }
 
 #[cfg(feature = "serde")]
-pub fn output_json(packets: &[Packet], bytes: &[u8]) -> String {
+pub fn output_json(
+    packets: &[Packet],
+    bytes: &[u8],
+    blocks: &[gpg_inspector_lib::ArmorBlock],
+    cleartext: Option<&str>,
+) -> String {
     use serde::Serialize;
 
     #[derive(Serialize)]
     struct JsonOutput {
         packets: Vec<JsonPacket>,
         bytes: String,
+        /// Armor blocks the input contained; ranges index `bytes`.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        blocks: Vec<JsonBlock>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cleartext: Option<String>,
+    }
+
+    #[derive(Serialize)]
+    struct JsonBlock {
+        armor_type: String,
+        range: JsonRange,
     }
 
     #[derive(Serialize)]
@@ -191,6 +261,12 @@ pub fn output_json(packets: &[Packet], bytes: &[u8]) -> String {
         tag: String,
         range: JsonRange,
         fields: Vec<JsonField>,
+        /// Nested packets from a decompressed Compressed Data payload.
+        /// Their ranges are relative to `decompressed_bytes`, not `bytes`.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        children: Vec<JsonPacket>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        decompressed_bytes: Option<String>,
     }
 
     #[derive(Serialize)]
@@ -207,9 +283,8 @@ pub fn output_json(packets: &[Packet], bytes: &[u8]) -> String {
         range: JsonRange,
     }
 
-    let json_packets: Vec<JsonPacket> = packets
-        .iter()
-        .map(|p| JsonPacket {
+    fn to_json_packet(p: &Packet) -> JsonPacket {
+        JsonPacket {
             tag: format!("{}", p.tag),
             range: JsonRange {
                 start: p.start,
@@ -229,12 +304,27 @@ pub fn output_json(packets: &[Packet], bytes: &[u8]) -> String {
                     },
                 })
                 .collect(),
-        })
-        .collect();
+            children: p.children.iter().map(to_json_packet).collect(),
+            decompressed_bytes: p.child_buffer.as_ref().map(|b| hex::encode(&b[..])),
+        }
+    }
+
+    let json_packets: Vec<JsonPacket> = packets.iter().map(to_json_packet).collect();
 
     let output = JsonOutput {
         packets: json_packets,
         bytes: hex::encode(bytes),
+        blocks: blocks
+            .iter()
+            .map(|b| JsonBlock {
+                armor_type: b.armor_type.to_string(),
+                range: JsonRange {
+                    start: b.range.0,
+                    end: b.range.1,
+                },
+            })
+            .collect(),
+        cleartext: cleartext.map(|s| s.to_string()),
     };
 
     serde_json::to_string_pretty(&output).unwrap_or_else(|_| "{}".to_string())
@@ -248,17 +338,17 @@ mod tests {
     use gpg_inspector_lib::packet::tags::PacketTag;
 
     fn make_test_packet() -> Packet {
-        Packet {
-            start: 0,
-            end: 10,
-            tag: PacketTag::UserId,
-            body: PacketBody::Unknown(vec![]),
-            fields: vec![
+        Packet::new(
+            0,
+            10,
+            PacketTag::UserId,
+            PacketBody::Unknown(vec![]),
+            vec![
                 Field::packet("Packet: User ID", "8 bytes", (0, 2)),
                 Field::field("User ID", "test", (2, 6)),
                 Field::subfield("Domain", "example.com", (6, 10)),
             ],
-        }
+        )
     }
 
     #[test]
@@ -412,19 +502,19 @@ mod tests {
     #[test]
     fn test_hex_dump_color_transitions() {
         // Create a packet where colors change mid-line
-        let packet = Packet {
-            start: 0,
-            end: 16,
-            tag: PacketTag::LiteralData,
-            body: PacketBody::Unknown(vec![]),
-            fields: vec![
+        let packet = Packet::new(
+            0,
+            16,
+            PacketTag::LiteralData,
+            PacketBody::Unknown(vec![]),
+            vec![
                 Field::packet("Packet", "16 bytes", (0, 2)),
                 Field::field("Field1", "data", (0, 4)),
                 Field::field("Field2", "data", (4, 8)),
                 Field::field("Field3", "data", (8, 12)),
                 Field::field("Field4", "data", (12, 16)),
             ],
-        };
+        );
 
         let bytes: Vec<u8> = (0..16).collect();
         let tracker = ColorTracker::compute_from_packets(&[packet], bytes.len());
@@ -442,16 +532,16 @@ mod tests {
     #[test]
     fn test_output_txt_field_without_color() {
         // Test packet header field (indent == 0)
-        let packet = Packet {
-            start: 0,
-            end: 5,
-            tag: PacketTag::UserId,
-            body: PacketBody::Unknown(vec![]),
-            fields: vec![
+        let packet = Packet::new(
+            0,
+            5,
+            PacketTag::UserId,
+            PacketBody::Unknown(vec![]),
+            vec![
                 Field::packet("Packet: User ID", "3 bytes", (0, 2)),
                 Field::field("Note", "test", (2, 5)),
             ],
-        };
+        );
 
         let bytes = vec![0xc6, 0x03, 0x61, 0x62, 0x63];
         let result = output_txt(&[packet], &bytes, true);
@@ -463,17 +553,17 @@ mod tests {
     #[test]
     fn test_output_txt_non_first_field_with_indent_zero() {
         // Test a field after the packet header that has indent 0 (unusual but tests the branch)
-        let packet = Packet {
-            start: 0,
-            end: 10,
-            tag: PacketTag::UserId,
-            body: PacketBody::Unknown(vec![]),
-            fields: vec![
+        let packet = Packet::new(
+            0,
+            10,
+            PacketTag::UserId,
+            PacketBody::Unknown(vec![]),
+            vec![
                 Field::packet("Packet: User ID", "8 bytes", (0, 2)),
                 Field::new("Section", "data", 0, (2, 6)), // indent 0 non-header field
                 Field::field("Value", "test", (6, 10)),
             ],
-        };
+        );
 
         let bytes = vec![0xc6, 0x08, 0x74, 0x65, 0x73, 0x74, 0x40, 0x65, 0x78, 0x2e];
         let result = output_txt(&[packet], &bytes, true);
@@ -483,22 +573,76 @@ mod tests {
         assert!(result.contains("Value: test"));
     }
 
+    const TEST_COMPRESSED: &[u8] = include_bytes!("../../fixtures/test.compressed.gpg");
+
+    #[test]
+    fn test_output_txt_nested_packets() {
+        let bytes: std::sync::Arc<[u8]> = TEST_COMPRESSED.into();
+        let packets = gpg_inspector_lib::parse_bytes(std::sync::Arc::clone(&bytes)).unwrap();
+
+        let result = output_txt(&packets, &bytes, false);
+
+        assert!(result.contains("=== Compressed Data Packet"));
+        assert!(result.contains("(decompressed) ==="));
+        assert!(result.contains("Literal Data Packet"));
+        assert!(result.contains("--- Decompressed Hex Dump (packet 1) ---"));
+        // The decompressed dump contains the literal payload as ASCII
+        // (split across 16-byte dump lines)
+        assert!(result.contains("hello ne"));
+        assert!(result.contains("sted world"));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_output_json_nested_packets() {
+        let bytes: std::sync::Arc<[u8]> = TEST_COMPRESSED.into();
+        let packets = gpg_inspector_lib::parse_bytes(std::sync::Arc::clone(&bytes)).unwrap();
+
+        let json = output_json(&packets, &bytes, &[], None);
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let cd = &parsed["packets"][0];
+        assert_eq!(cd["tag"], "Compressed Data");
+        assert_eq!(cd["children"][0]["tag"], "Literal Data");
+        assert!(cd["decompressed_bytes"].as_str().unwrap().len() > 0);
+        // Plain packets omit the nested keys entirely
+        assert!(parsed["blocks"].is_null());
+        assert!(parsed["cleartext"].is_null());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_output_json_blocks_and_cleartext() {
+        let packet = make_test_packet();
+        let bytes = vec![0u8; 10];
+        let blocks = vec![gpg_inspector_lib::ArmorBlock {
+            armor_type: "PGP SIGNATURE".into(),
+            range: (0, 10),
+        }];
+        let json = output_json(&[packet], &bytes, &blocks, Some("hello"));
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["blocks"][0]["armor_type"], "PGP SIGNATURE");
+        assert_eq!(parsed["blocks"][0]["range"]["end"], 10);
+        assert_eq!(parsed["cleartext"], "hello");
+    }
+
     #[cfg(feature = "serde")]
     #[test]
     fn test_output_json_structure() {
-        let packet = Packet {
-            start: 0,
-            end: 10,
-            tag: PacketTag::UserId,
-            body: PacketBody::Unknown(vec![]),
-            fields: vec![
+        let packet = Packet::new(
+            0,
+            10,
+            PacketTag::UserId,
+            PacketBody::Unknown(vec![]),
+            vec![
                 Field::packet("Packet: User ID", "5 bytes", (0, 2)),
                 Field::field("User ID", "test@example.com", (2, 10)),
             ],
-        };
+        );
 
         let bytes = vec![0xc6, 0x05, 0x74, 0x65, 0x73, 0x74, 0x40, 0x65, 0x78, 0x2e];
-        let json = output_json(&[packet], &bytes);
+        let json = output_json(&[packet], &bytes, &[], None);
 
         // Verify it's valid JSON
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();

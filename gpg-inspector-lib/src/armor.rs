@@ -121,10 +121,23 @@ pub struct ArmorResult {
 /// ```
 pub fn decode_armor(input: &str) -> Result<ArmorResult> {
     let lines: Vec<&str> = input.lines().collect();
+    let (bytes, armor_type, _next) = decode_block(&lines, 0)?;
 
-    let header_idx = lines
+    Ok(ArmorResult {
+        bytes: bytes.into(),
+        armor_type: armor_type.into(),
+    })
+}
+
+/// Decodes the first armor block found at or after line index `from`.
+///
+/// Returns the decoded bytes, the armor type, and the line index just
+/// past the block's END footer.
+fn decode_block(lines: &[&str], from: usize) -> Result<(Vec<u8>, String, usize)> {
+    let header_idx = lines[from..]
         .iter()
         .position(|line| line.starts_with("-----BEGIN ") && line.ends_with("-----"))
+        .map(|p| p + from)
         .ok_or_else(|| Error::InvalidArmor("Missing BEGIN header".into()))?;
 
     let header_line = lines[header_idx];
@@ -135,9 +148,10 @@ pub fn decode_armor(input: &str) -> Result<ArmorResult> {
         .to_string();
 
     let end_marker = format!("-----END {}-----", armor_type);
-    let footer_idx = lines
+    let footer_idx = lines[header_idx..]
         .iter()
         .position(|line| *line == end_marker)
+        .map(|p| p + header_idx)
         .ok_or_else(|| Error::InvalidArmor("Missing END header".into()))?;
 
     let mut body_start = header_idx + 1;
@@ -188,8 +202,127 @@ pub fn decode_armor(input: &str) -> Result<ArmorResult> {
         }
     }
 
-    Ok(ArmorResult {
+    Ok((bytes, armor_type, footer_idx + 1))
+}
+
+/// One decoded armor block within a [`MultiArmorResult`].
+pub struct ArmorBlock {
+    /// The armor type (e.g., "PGP PUBLIC KEY BLOCK", "PGP SIGNATURE").
+    pub armor_type: Arc<str>,
+    /// Byte range of this block's decoded data within
+    /// [`MultiArmorResult::bytes`].
+    pub range: (usize, usize),
+}
+
+/// The result of decoding input that may contain several armor blocks
+/// and/or a cleartext signed message.
+pub struct MultiArmorResult {
+    /// All blocks' decoded binary data, concatenated in input order, so
+    /// that packet byte spans share a single address space.
+    pub bytes: Arc<[u8]>,
+    /// The decoded blocks, in input order, with their byte ranges.
+    pub blocks: Vec<ArmorBlock>,
+    /// The dash-unescaped cleartext, if the input contained a
+    /// `-----BEGIN PGP SIGNED MESSAGE-----` section.
+    pub cleartext: Option<Arc<str>>,
+}
+
+const CLEARTEXT_HEADER: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
+const SIGNATURE_HEADER: &str = "-----BEGIN PGP SIGNATURE-----";
+
+/// Decodes ASCII-armored PGP data that may contain multiple armor blocks.
+///
+/// A strict superset of [`decode_armor`]: every `-----BEGIN ... -----`
+/// block in the input is decoded and the binary data concatenated (with
+/// per-block ranges in [`MultiArmorResult::blocks`]). Cleartext signed
+/// messages (`-----BEGIN PGP SIGNED MESSAGE-----`) are also handled: the
+/// dash-escaped cleartext is captured and the trailing signature block is
+/// decoded normally.
+///
+/// # Errors
+///
+/// Returns `Error::InvalidArmor` if no armor block is found, a block is
+/// malformed, or a cleartext section has no trailing signature block.
+/// Base64 and CRC24 checksum errors propagate per block.
+pub fn decode_armor_multi(input: &str) -> Result<MultiArmorResult> {
+    let lines: Vec<&str> = input.lines().collect();
+
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut blocks: Vec<ArmorBlock> = Vec::new();
+    let mut cleartext: Option<Arc<str>> = None;
+    let mut idx = 0;
+
+    while let Some(begin_rel) = lines[idx..]
+        .iter()
+        .position(|line| line.starts_with("-----BEGIN ") && line.ends_with("-----"))
+    {
+        let begin_idx = idx + begin_rel;
+
+        if lines[begin_idx] == CLEARTEXT_HEADER {
+            let (text, sig_idx) = read_cleartext(&lines, begin_idx + 1)?;
+            if cleartext.is_none() {
+                cleartext = Some(text.into());
+            }
+            // Continue at the signature header; it decodes as a normal block
+            idx = sig_idx;
+            continue;
+        }
+
+        let (block_bytes, armor_type, next) = decode_block(&lines, begin_idx)?;
+        let start = bytes.len();
+        bytes.extend_from_slice(&block_bytes);
+        blocks.push(ArmorBlock {
+            armor_type: armor_type.into(),
+            range: (start, bytes.len()),
+        });
+        idx = next;
+    }
+
+    if blocks.is_empty() {
+        return Err(Error::InvalidArmor("Missing BEGIN header".into()));
+    }
+
+    Ok(MultiArmorResult {
         bytes: bytes.into(),
-        armor_type: armor_type.into(),
+        blocks,
+        cleartext,
     })
+}
+
+/// Reads a cleartext signed message body starting just after its BEGIN
+/// line. Skips `Hash:` armor headers, collects dash-unescaped text until
+/// the signature block, and returns the text plus the line index of the
+/// `-----BEGIN PGP SIGNATURE-----` header.
+fn read_cleartext(lines: &[&str], mut idx: usize) -> Result<(String, usize)> {
+    // Armor headers (e.g. "Hash: SHA256") end at the first empty line
+    while idx < lines.len() && !lines[idx].is_empty() {
+        idx += 1;
+    }
+    if idx < lines.len() {
+        idx += 1; // skip the blank separator line
+    }
+
+    let mut text_lines: Vec<&str> = Vec::new();
+    while idx < lines.len() {
+        let line = lines[idx];
+        if line == SIGNATURE_HEADER {
+            return Ok((text_lines.join("\n"), idx));
+        }
+        text_lines.push(line.strip_prefix("- ").unwrap_or(line));
+        idx += 1;
+    }
+
+    Err(Error::InvalidArmor(
+        "Cleartext signed message missing signature block".into(),
+    ))
+}
+
+/// Returns `true` if `bytes` looks like raw (unarmored) binary PGP data.
+///
+/// Every OpenPGP packet stream begins with a tag octet whose high bit is
+/// set (RFC 4880 §4.2), while ASCII-armored input always begins with
+/// printable ASCII, so testing the first byte's high bit is a reliable
+/// discriminator.
+pub fn looks_binary(bytes: &[u8]) -> bool {
+    bytes.first().is_some_and(|&b| b & 0x80 != 0)
 }

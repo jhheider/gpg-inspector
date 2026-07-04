@@ -13,6 +13,10 @@ Inspired by [ConradIrwin/gpg-decoder](https://github.com/ConradIrwin/gpg-decoder
 
 - Interactive TUI with synchronized hex view and packet display
 - Real-time parsing as you type or paste armored GPG data
+- Raw binary input: open unarmored `.gpg`/`.sig` files or pipe binary data
+- Computed key fingerprints and key IDs (SHA-1 for v4, SHA-256 for v6 keys)
+- Compressed Data packets are decompressed (ZIP/ZLIB/BZip2) and their nested packets parsed
+- Multiple armor blocks in one input, and cleartext signed messages
 - Color-coded byte visualization linking fields to raw bytes
 - Field search (`/`) and full-value detail view (`Enter`)
 - Old and new OpenPGP packet formats, packet versions v3 through v6 (RFC 4880 and RFC 9580)
@@ -55,11 +59,13 @@ cargo build --release
 # Start with empty input
 gpg-inspector
 
-# Load from file
+# Load from file (armored or raw binary)
 gpg-inspector -f key.asc
+gpg-inspector -f key.gpg
 
-# Pipe from GPG
+# Pipe from GPG (armored or binary)
 gpg --export --armor KEY_ID | gpg-inspector
+gpg --export KEY_ID | gpg-inspector
 
 # Pipe from file
 cat message.asc | gpg-inspector

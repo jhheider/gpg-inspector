@@ -530,3 +530,35 @@ fn test_data_selection_updates_highlight() {
     handle_event(&mut app, key_event(KeyCode::Down), test_rect());
     assert!(app.highlighted_bytes.is_some());
 }
+
+// Binary mode event tests
+
+const TEST_KEY_BIN: &[u8] = include_bytes!("../../fixtures/test.key.gpg");
+
+#[test]
+fn test_binary_mode_editing_keys_noop() {
+    let mut app = App::new();
+    app.load_binary(TEST_KEY_BIN.to_vec(), "test.key.gpg");
+    app.focus = PanelFocus::Input;
+    let packet_count = app.packets.len();
+
+    handle_event(&mut app, key_event(KeyCode::Char('x')), test_rect());
+    handle_event(&mut app, key_event(KeyCode::Backspace), test_rect());
+    handle_event(&mut app, key_event(KeyCode::Enter), test_rect());
+    handle_event(&mut app, Event::Paste("junk".to_string()), test_rect());
+
+    assert!(app.input.is_empty());
+    assert_eq!(app.packets.len(), packet_count);
+    assert!(app.is_binary());
+}
+
+#[test]
+fn test_binary_mode_ctrl_k_resets() {
+    let mut app = App::new();
+    app.load_binary(TEST_KEY_BIN.to_vec(), "test.key.gpg");
+    app.focus = PanelFocus::Input;
+
+    handle_event(&mut app, key_event_ctrl(KeyCode::Char('k')), test_rect());
+    assert!(!app.is_binary());
+    assert!(app.packets.is_empty());
+}
