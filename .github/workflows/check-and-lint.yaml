@@ -1,11 +1,18 @@
 on:
   pull_request:
+    paths-ignore: ["**.md", "LICENSE", ".gitignore", "reference/**"]
   push:
     branches:
       - main
+    paths-ignore: ["**.md", "LICENSE", ".gitignore", "reference/**"]
 
+# Cancel a superseded in-progress run when a new commit lands on the same ref
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
 
 name: Check and Lint
 
