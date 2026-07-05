@@ -29,6 +29,26 @@ Inspired by [ConradIrwin/gpg-decoder](https://github.com/ConradIrwin/gpg-decoder
 
 ## Installation
 
+### Homebrew
+
+```bash
+brew install jhheider/tap/gpg-inspector
+```
+
+### Cargo
+
+```bash
+cargo install gpg-inspector
+```
+
+### pkgx
+
+```bash
+pkgx gpg-inspector
+# or
+pkgx +crates.io/gpg-inspector
+```
+
 ### Prebuilt binaries
 
 Download the latest release for your platform from the
