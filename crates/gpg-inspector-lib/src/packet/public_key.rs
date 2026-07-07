@@ -147,7 +147,7 @@ pub fn parse_public_key(
 /// Appends computed fingerprint and key ID fields for V4 and V6 keys.
 ///
 /// The hashed region is the public key body (version octet through key
-/// material), i.e. `stream` bytes `body_start..pos()` — for secret keys
+/// material), i.e. `stream` bytes `body_start..pos()` - for secret keys
 /// this is called before any S2K/secret material is read, so the same
 /// region applies. V3 (MD5) keys and unknown versions get no fields.
 /// The fields' span is the hashed region, and their names carry a

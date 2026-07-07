@@ -29,7 +29,7 @@ impl Widget for HexPanel<'_> {
         // decompressed buffer for nested packets).
         let title = if self.app.display_stream() > 0 {
             let depth = self.app.selected_row().map(|r| r.depth).unwrap_or(1);
-            format!(" Hex View — decompressed (depth {}) ", depth)
+            format!(" Hex View - decompressed (depth {}) ", depth)
         } else {
             " Hex View ".to_string()
         };

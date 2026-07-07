@@ -38,9 +38,9 @@ impl Widget for InputPanel<'_> {
         } else if self.app.is_binary() {
             " Input (binary, read-only) ".to_string()
         } else if self.app.cleartext.is_some() {
-            " Input — cleartext signed message ".to_string()
+            " Input - cleartext signed message ".to_string()
         } else if self.app.armor_blocks.len() > 1 {
-            format!(" Input — {} armor blocks ", self.app.armor_blocks.len())
+            format!(" Input - {} armor blocks ", self.app.armor_blocks.len())
         } else {
             " Input (paste GPG armored text) ".to_string()
         };

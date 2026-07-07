@@ -104,7 +104,7 @@ impl Theme {
         }
     }
 
-    /// Picks a theme from a `COLORFGBG`-style value ("fg;bg" — some
+    /// Picks a theme from a `COLORFGBG`-style value ("fg;bg" - some
     /// terminals add a middle field). Background colors 7 and 15 mean
     /// a light background; anything else (or no value) means dark.
     pub fn from_colorfgbg(var: Option<&str>) -> Self {

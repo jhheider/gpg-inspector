@@ -35,12 +35,12 @@ impl Widget for DataPanel<'_> {
 
         let matches = self.app.search_matches();
         let title = if let Some(ref status) = self.app.status_message {
-            format!(" Decoded Data — {} ", status)
+            format!(" Decoded Data - {} ", status)
         } else if self.app.search_active {
-            format!(" Decoded Data — /{}█ ", self.app.search_query)
+            format!(" Decoded Data - /{}█ ", self.app.search_query)
         } else if !self.app.search_query.is_empty() {
             format!(
-                " Decoded Data — /{} ({} match{}) ",
+                " Decoded Data - /{} ({} match{}) ",
                 self.app.search_query,
                 matches.len(),
                 if matches.len() == 1 { "" } else { "es" }

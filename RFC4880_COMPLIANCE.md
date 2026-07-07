@@ -7,7 +7,7 @@ This document tracks gpg-inspector-lib's compliance with [RFC 4880 (OpenPGP Mess
 
 ## Design Philosophy
 
-gpg-inspector is a **parsing and inspection library**, not a cryptographic implementation. It extracts and displays packet structure without performing cryptographic operations (decryption, signature verification, key derivation). This is intentional—the goal is to inspect and debug OpenPGP data, not to process it.
+gpg-inspector is a **parsing and inspection library**, not a cryptographic implementation. It extracts and displays packet structure without performing cryptographic operations (decryption, signature verification, key derivation). This is intentional-the goal is to inspect and debug OpenPGP data, not to process it.
 
 ---
 
@@ -38,7 +38,7 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 | 3.7.1.1 | Simple S2K | ✅ Complete | Type 0 |
 | 3.7.1.2 | Salted S2K | ✅ Complete | Type 1, 8-byte salt |
 | 3.7.1.3 | Iterated and Salted S2K | ✅ Complete | Type 3, with count formula |
-| — | Argon2 S2K (RFC 9580) | ✅ Complete | Type 4, memory-hard KDF |
+| - | Argon2 S2K (RFC 9580) | ✅ Complete | Type 4, memory-hard KDF |
 
 ---
 
@@ -60,7 +60,7 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 
 | Tag | Packet Type | Section | Status | Notes |
 |-----|-------------|---------|--------|-------|
-| 0 | Reserved | — | ⬜ N/A | Must not appear |
+| 0 | Reserved | - | ⬜ N/A | Must not appear |
 | 1 | Public-Key Encrypted Session Key | 5.1 | ✅ Complete | Version, key ID, algorithm, encrypted data |
 | 2 | Signature | 5.2 | ✅ Complete | V3, V4 (V6 per RFC 9580); draft V5 shares the V4 wire layout |
 | 3 | Symmetric-Key Encrypted Session Key | 5.3 | ✅ Complete | Version, algorithm, S2K, encrypted key |
@@ -78,9 +78,9 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 | 17 | User Attribute | 5.12 | ✅ Complete | Image subpacket with JPEG detection |
 | 18 | Sym. Encrypted Integrity Protected Data | 5.13 | ✅ Complete | V1 (MDC) and V2 (AEAD) |
 | 19 | Modification Detection Code | 5.14 | ✅ Complete | 20-byte SHA-1 hash extracted |
-| 20 | AEAD Encrypted Data (RFC 9580) | — | ✅ Complete | Version, algorithm, AEAD mode, chunk size |
-| 21 | Padding (RFC 9580) | — | ✅ Complete | Random padding bytes |
-| 60-63 | Private/Experimental | — | ✅ Complete | Stored as raw bytes |
+| 20 | AEAD Encrypted Data (RFC 9580) | - | ✅ Complete | Version, algorithm, AEAD mode, chunk size |
+| 21 | Padding (RFC 9580) | - | ✅ Complete | Random padding bytes |
+| 60-63 | Private/Experimental | - | ✅ Complete | Stored as raw bytes |
 
 ---
 
@@ -95,7 +95,7 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 | 6 | Regular Expression | 5.2.3.14 | ✅ Complete | Null-terminated string |
 | 7 | Revocable | 5.2.3.12 | ✅ Complete | Boolean |
 | 9 | Key Expiration Time | 5.2.3.6 | ✅ Complete | Seconds after key creation |
-| 10 | Placeholder | — | ⬜ N/A | Backward compatibility only |
+| 10 | Placeholder | - | ⬜ N/A | Backward compatibility only |
 | 11 | Preferred Symmetric Algorithms | 5.2.3.7 | ✅ Complete | Ordered array |
 | 12 | Revocation Key | 5.2.3.15 | ✅ Complete | Class, algorithm, fingerprint |
 | 16 | Issuer | 5.2.3.5 | ✅ Complete | 8-octet Key ID |
@@ -112,13 +112,13 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 | 30 | Features | 5.2.3.24 | ✅ Complete | MDC, AEAD, V5 keys |
 | 31 | Signature Target | 5.2.3.25 | ✅ Complete | Algorithms + hash |
 | 32 | Embedded Signature | 5.2.3.26 | ✅ Complete | Full signature packet |
-| 33 | Issuer Fingerprint (RFC 9580) | — | ✅ Complete | Version + fingerprint |
-| 34 | Preferred AEAD Algorithms (RFC 9580) | — | ✅ Complete | Ordered array |
-| 35 | Intended Recipient (RFC 9580) | — | ✅ Complete | Version + fingerprint |
-| 37 | Attested Certifications (RFC 9580) | — | ✅ Complete | Hash list |
-| 38 | Key Block (RFC 9580) | — | ✅ Complete | Flags + key data |
-| 39 | Preferred AEAD Ciphersuites (RFC 9580) | — | ✅ Complete | Cipher + AEAD pairs |
-| 100-110 | Private/Experimental | — | ✅ Complete | Raw bytes preserved |
+| 33 | Issuer Fingerprint (RFC 9580) | - | ✅ Complete | Version + fingerprint |
+| 34 | Preferred AEAD Algorithms (RFC 9580) | - | ✅ Complete | Ordered array |
+| 35 | Intended Recipient (RFC 9580) | - | ✅ Complete | Version + fingerprint |
+| 37 | Attested Certifications (RFC 9580) | - | ✅ Complete | Hash list |
+| 38 | Key Block (RFC 9580) | - | ✅ Complete | Flags + key data |
+| 39 | Preferred AEAD Ciphersuites (RFC 9580) | - | ✅ Complete | Cipher + AEAD pairs |
+| 100-110 | Private/Experimental | - | ✅ Complete | Raw bytes preserved |
 
 ---
 
@@ -255,6 +255,6 @@ gpg-inspector also supports these RFC 9580 extensions:
 
 ## Legend
 
-- ✅ **Complete** — Fully implemented per specification
-- ⚠️ **Partial** — Some functionality missing
-- ⬜ **N/A** — Not applicable to parsing library or deprecated
+- ✅ **Complete** - Fully implemented per specification
+- ⚠️ **Partial** - Some functionality missing
+- ⬜ **N/A** - Not applicable to parsing library or deprecated
