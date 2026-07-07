@@ -16,9 +16,9 @@ default = ["decompress"]
 decompress = ["dep:flate2", "dep:bzip2"]
 
 [dependencies]
-thiserror = "2.0"
-chrono = { version = "0.4", default-features = false, features = ["std"] }
-sha1 = "0.10"
-sha2 = "0.10"
-flate2 = { version = "1", optional = true }
-bzip2 = { version = "0.6", optional = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+flate2 = { workspace = true, optional = true }
+bzip2 = { workspace = true, optional = true }
