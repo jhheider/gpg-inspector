@@ -56,7 +56,7 @@ pub struct Row {
     pub stream: usize,
     /// DFS-order id of the packet (or marker) this row belongs to.
     pub packet_id: usize,
-    /// True for the first row of its packet — the fold anchor that
+    /// True for the first row of its packet - the fold anchor that
     /// stays visible when the packet is collapsed.
     pub is_packet_first: bool,
     /// Palette color index; None for header/marker rows.

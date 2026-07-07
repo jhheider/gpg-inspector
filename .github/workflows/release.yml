@@ -2,7 +2,7 @@ name: Release
 
 # Fires when a GitHub Release is published. The full release ceremony:
 #   gh release create vX.Y.Z --generate-notes
-# (version must already be committed in Cargo.toml) — this builds the
+# (version must already be committed in Cargo.toml) - this builds the
 # platform binaries, attaches them, and publishes both crates.
 on:
   release:

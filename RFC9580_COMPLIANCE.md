@@ -7,7 +7,7 @@ This document tracks gpg-inspector-lib's compliance with [RFC 9580 (OpenPGP)](ht
 
 ## Design Philosophy
 
-gpg-inspector is a **parsing and inspection library**, not a cryptographic implementation. It extracts and displays packet structure without performing cryptographic operations (decryption, signature verification, key derivation). This is intentional—the goal is to inspect and debug OpenPGP data, not to process it.
+gpg-inspector is a **parsing and inspection library**, not a cryptographic implementation. It extracts and displays packet structure without performing cryptographic operations (decryption, signature verification, key derivation). This is intentional-the goal is to inspect and debug OpenPGP data, not to process it.
 
 ---
 
@@ -25,7 +25,7 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 
 ## Version 6 Packet Types
 
-RFC 9580 introduces Version 6 formats for several packet types. V5 was a draft that never shipped — RFC 9580 skips from V4 to V6.
+RFC 9580 introduces Version 6 formats for several packet types. V5 was a draft that never shipped - RFC 9580 skips from V4 to V6.
 
 | Packet Type | Tag | Status | Notes |
 |-------------|-----|--------|-------|
@@ -231,6 +231,6 @@ gpg-inspector has been designed to parse OpenPGP data from:
 
 ## Legend
 
-- ✅ **Complete** — Fully implemented per specification
-- ⚠️ **Deprecated** — Supported for backward compatibility but deprecated by RFC 9580
-- ⬜ **N/A** — Not applicable to parsing library
+- ✅ **Complete** - Fully implemented per specification
+- ⚠️ **Deprecated** - Supported for backward compatibility but deprecated by RFC 9580
+- ⬜ **N/A** - Not applicable to parsing library
