@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Context, Result, anyhow};
 use clap::Parser;
+use color_eyre::eyre::{Result, WrapErr, eyre};
 use crossterm::{
     event::{
         DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, poll,
@@ -53,6 +53,8 @@ struct Cli {
 /// Requires TTY for terminal setup/teardown
 #[cfg(not(tarpaulin_include))]
 fn main() -> Result<()> {
+    color_eyre::install()?;
+
     let cli = Cli::parse();
 
     // Load initial input from file or stdin
@@ -65,13 +67,13 @@ fn main() -> Result<()> {
     let wants_output = cli.txt;
 
     if wants_output {
-        let input = initial_input.ok_or_else(|| anyhow!("No input provided"))?;
+        let input = initial_input.ok_or_else(|| eyre!("No input provided"))?;
         let (bytes, blocks, cleartext): (Arc<[u8]>, _, _) =
             if gpg_inspector_lib::looks_binary(&input) {
                 (input.into(), Vec::new(), None)
             } else {
                 let text = String::from_utf8(input)
-                    .map_err(|_| anyhow!("Input is neither binary PGP data nor valid UTF-8"))?;
+                    .map_err(|_| eyre!("Input is neither binary PGP data nor valid UTF-8"))?;
                 let multi = gpg_inspector_lib::decode_armor_multi(&text)?;
                 (multi.bytes, multi.blocks, multi.cleartext)
             };
@@ -120,7 +122,7 @@ fn main() -> Result<()> {
             app.load_binary(input, origin);
         } else {
             app.input = String::from_utf8(input)
-                .map_err(|_| anyhow!("Input is neither binary PGP data nor valid UTF-8"))?;
+                .map_err(|_| eyre!("Input is neither binary PGP data nor valid UTF-8"))?;
             app.cursor_pos = app.input.len();
             app.parse_input();
         }
@@ -146,7 +148,7 @@ fn load_initial_input(cli: &Cli) -> Result<Option<Vec<u8>>> {
     // File takes precedence
     if let Some(path) = &cli.file {
         let content = std::fs::read(path)
-            .with_context(|| format!("Failed to read file: {}", path.display()))?;
+            .wrap_err_with(|| format!("Failed to read file: {}", path.display()))?;
         return Ok(Some(content));
     }
 
@@ -157,7 +159,7 @@ fn load_initial_input(cli: &Cli) -> Result<Option<Vec<u8>>> {
         stdin
             .lock()
             .read_to_end(&mut input)
-            .context("Failed to read from stdin")?;
+            .wrap_err("Failed to read from stdin")?;
         if !input.is_empty() {
             return Ok(Some(input));
         }
