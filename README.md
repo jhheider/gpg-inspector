@@ -1,9 +1,9 @@
-[![Coverage Status](https://coveralls.io/repos/github/jhheider/gpg-inspector/badge.svg?branch=main)](https://coveralls.io/github/jhheider/gpg-inspector?branch=main)
-[![Test Status](https://github.com/jhheider/gpg-inspector/actions/workflows/test.yml/badge.svg)](https://github.com/jhheider/gpg-inspector/actions/workflows/test.yml)
-[![Checks](https://github.com/jhheider/gpg-inspector/actions/workflows/check-and-lint.yaml/badge.svg)](https://github.com/jhheider/gpg-inspector/actions/workflows/check-and-lint.yaml)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
 # gpg-inspector
+
+[![CI](https://github.com/jhheider/gpg-inspector/actions/workflows/ci.yml/badge.svg)](https://github.com/jhheider/gpg-inspector/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/jhheider/gpg-inspector/badge.svg?branch=main)](https://coveralls.io/github/jhheider/gpg-inspector?branch=main)
+[![crates.io](https://img.shields.io/crates/v/gpg-inspector.svg)](https://crates.io/crates/gpg-inspector)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 
 A terminal user interface for inspecting GPG/OpenPGP packet structures. Decode armored GPG data and visualize the underlying packet format with color-coded byte highlighting.
 
