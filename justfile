@@ -2,6 +2,9 @@ set fallback
 
 # Development recipes; CI runs the same checks (.github/workflows)
 
+default:
+    @just --list
+
 # Run all checks: formatting, linting, tests
 check: fmt clippy test
 
@@ -35,3 +38,8 @@ coverage:
 # Security audit (also runs weekly in CI)
 audit:
     cargo audit
+
+# Clean build artifacts
+clean:
+    cargo clean
+    rm -rf coverage
