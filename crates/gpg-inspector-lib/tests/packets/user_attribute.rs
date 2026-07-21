@@ -1,4 +1,4 @@
-//! User Attribute packet tests - Tag 17
+//! User Attribute packet tests (Tag 17)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;
@@ -410,7 +410,7 @@ fn build_user_attribute_tiny_image() -> Vec<u8> {
     let mut packet = Vec::new();
     packet.push(0xC0 | 17); // Tag 17 = User Attribute
 
-    // Only 2 bytes of image data - too small for format detection
+    // Only 2 bytes of image data, too small for format detection
     let image_data = [0x00, 0x00];
     let header_len = 16;
     let subpacket_data_len = 1 + header_len + image_data.len();
@@ -477,7 +477,7 @@ fn build_user_attribute_unknown_header_no_remaining() -> Vec<u8> {
     packet.push(0x00); // Header length high byte
     packet.push(99); // Unknown header version
 
-    // No more data - remaining should be 0
+    // No more data; remaining should be 0
 
     packet
 }
@@ -599,7 +599,7 @@ fn build_user_attribute_truncated_image() -> Vec<u8> {
     packet.push(1); // JPEG format
     packet.extend_from_slice(&[0x00; 12]); // Reserved
 
-    // Only 1 byte of "image data" - but header claims more is coming
+    // Only 1 byte of "image data", but header claims more is coming
     packet.push(0xAB);
 
     // Stream ends here, but subpacket_data_len claims there should be 2 more bytes

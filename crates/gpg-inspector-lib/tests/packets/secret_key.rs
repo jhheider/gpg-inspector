@@ -1,4 +1,4 @@
-//! Secret Key packet tests - Tag 5
+//! Secret Key packet tests (Tag 5)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;
@@ -95,7 +95,7 @@ fn test_secret_key_encrypted_s2k_254_non_aes() {
 
 #[test]
 fn test_secret_key_encrypted_simple_s2k() {
-    // Simple S2K (type 0) - no salt or count
+    // Simple S2K (type 0), no salt or count
     let mut extra = Vec::new();
     extra.push(7); // AES-128
     extra.push(0); // Simple S2K

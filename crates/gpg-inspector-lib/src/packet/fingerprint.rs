@@ -3,7 +3,7 @@
 //! Computing a fingerprint requires hashing the public key material
 //! (RFC 4880 §12.2, RFC 9580 §5.5.4). This is the library's single
 //! deliberate exception to its "no cryptographic operations" design
-//! philosophy: hashing for key *identity* only - never decryption,
+//! philosophy: hashing for key *identity* only, never decryption,
 //! signature verification, or key generation.
 //!
 //! V3 (MD5) fingerprints are intentionally not computed: v3 keys are

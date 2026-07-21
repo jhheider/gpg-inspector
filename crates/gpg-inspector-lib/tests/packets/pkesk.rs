@@ -1,4 +1,4 @@
-//! PKESK (Public-Key Encrypted Session Key) packet tests - Tag 1
+//! PKESK (Public-Key Encrypted Session Key) packet tests (Tag 1)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

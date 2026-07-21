@@ -1,4 +1,4 @@
-//! Tests for signature.rs - signature packets and all subpacket types
+//! Tests for signature.rs: signature packets and all subpacket types
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

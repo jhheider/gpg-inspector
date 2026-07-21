@@ -1,9 +1,9 @@
-//! Tests for lookup.rs - algorithm and type lookups
+//! Tests for lookup.rs: algorithm and type lookups
 
 use gpg_inspector_lib::lookup::*;
 
 // ============================================================================
-// Public Key Algorithm - all branches
+// Public Key Algorithm: all branches
 // ============================================================================
 
 #[test]
@@ -41,7 +41,7 @@ fn test_public_key_algorithm_all_values() {
 }
 
 // ============================================================================
-// Symmetric Algorithm - all branches
+// Symmetric Algorithm: all branches
 // ============================================================================
 
 #[test]
@@ -71,7 +71,7 @@ fn test_symmetric_algorithm_all_values() {
 }
 
 // ============================================================================
-// Hash Algorithm - all branches
+// Hash Algorithm: all branches
 // ============================================================================
 
 #[test]
@@ -101,7 +101,7 @@ fn test_hash_algorithm_all_values() {
 }
 
 // ============================================================================
-// Compression Algorithm - all branches
+// Compression Algorithm: all branches
 // ============================================================================
 
 #[test]
@@ -125,7 +125,7 @@ fn test_compression_algorithm_all_values() {
 }
 
 // ============================================================================
-// Signature Type - all branches
+// Signature Type: all branches
 // ============================================================================
 
 #[test]
@@ -159,7 +159,7 @@ fn test_signature_type_all_values() {
 }
 
 // ============================================================================
-// Subpacket Type - all branches
+// Subpacket Type: all branches
 // ============================================================================
 
 #[test]
@@ -222,7 +222,7 @@ fn test_subpacket_type_all_values() {
 }
 
 // ============================================================================
-// Curve OID - all branches
+// Curve OID: all branches
 // ============================================================================
 
 #[test]
@@ -258,7 +258,7 @@ fn test_curve_oid_all_values() {
 }
 
 // ============================================================================
-// Key Flags - all branches
+// Key Flags: all branches
 // ============================================================================
 
 #[test]
@@ -294,7 +294,7 @@ fn test_key_flags_all_bits() {
 }
 
 // ============================================================================
-// Revocation Reason - all branches
+// Revocation Reason: all branches
 // ============================================================================
 
 #[test]
@@ -308,7 +308,7 @@ fn test_revocation_reason_all_values() {
 }
 
 // ============================================================================
-// S2K Type - all branches
+// S2K Type: all branches
 // ============================================================================
 
 #[test]
@@ -329,7 +329,7 @@ fn test_s2k_type_all_values() {
 }
 
 // ============================================================================
-// AEAD Algorithm - all branches
+// AEAD Algorithm: all branches
 // ============================================================================
 
 #[test]
@@ -349,7 +349,7 @@ fn test_aead_algorithm_all_values() {
 }
 
 // ============================================================================
-// V6 Signature Salt Length - all branches
+// V6 Signature Salt Length: all branches
 // ============================================================================
 
 #[test]
@@ -371,7 +371,7 @@ fn test_v6_signature_salt_len() {
 }
 
 // ============================================================================
-// Raw Signature Length - all branches
+// Raw Signature Length: all branches
 // ============================================================================
 
 #[test]

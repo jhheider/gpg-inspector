@@ -1,4 +1,4 @@
-//! Packet format tests - old/new format headers and length encoding
+//! Packet format tests: old/new format headers and length encoding
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

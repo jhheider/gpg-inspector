@@ -11,7 +11,7 @@ use std::fmt;
 /// Tags 0-63 are defined by the standard, with some reserved for future use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PacketTag {
-    /// Reserved (tag 0) - must not be used.
+    /// Reserved (tag 0), must not be used.
     Reserved,
     /// Public-Key Encrypted Session Key (tag 1).
     PublicKeyEncryptedSessionKey,

@@ -1,4 +1,4 @@
-//! Literal Data packet tests - Tag 11
+//! Literal Data packet tests (Tag 11)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

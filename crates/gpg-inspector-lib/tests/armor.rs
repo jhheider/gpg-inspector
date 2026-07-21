@@ -1,4 +1,4 @@
-//! Tests for armor.rs - ASCII armor decoding
+//! Tests for armor.rs: ASCII armor decoding
 
 use gpg_inspector_lib::decode_armor;
 

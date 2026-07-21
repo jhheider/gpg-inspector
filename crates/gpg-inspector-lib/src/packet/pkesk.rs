@@ -179,7 +179,7 @@ fn parse_pkesk_v6(
     // V6: Variable key identification based on key version
     let key_id = match key_version {
         0 => {
-            // Anonymous recipient - no key ID
+            // Anonymous recipient, no key ID
             String::new()
         }
         4 => {
@@ -207,7 +207,7 @@ fn parse_pkesk_v6(
             fingerprint
         }
         _ => {
-            // Unknown key version - try to continue
+            // Unknown key version; try to continue
             String::new()
         }
     };

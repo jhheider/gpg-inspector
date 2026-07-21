@@ -1,4 +1,4 @@
-//! Tests for public_key.rs - all key algorithm types
+//! Tests for public_key.rs: all key algorithm types
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

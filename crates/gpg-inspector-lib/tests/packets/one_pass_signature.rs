@@ -1,4 +1,4 @@
-//! One-Pass Signature packet tests - Tag 4
+//! One-Pass Signature packet tests (Tag 4)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

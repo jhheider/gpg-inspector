@@ -25,7 +25,7 @@ gpg-inspector is a **parsing and inspection library**, not a cryptographic imple
 
 ## Version 6 Packet Types
 
-RFC 9580 introduces Version 6 formats for several packet types. V5 was a draft that never shipped - RFC 9580 skips from V4 to V6.
+RFC 9580 introduces Version 6 formats for several packet types. V5 was a draft that never shipped; RFC 9580 skips from V4 to V6.
 
 | Packet Type | Tag | Status | Notes |
 |-------------|-----|--------|-------|

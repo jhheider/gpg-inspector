@@ -1,4 +1,4 @@
-//! Miscellaneous packet tests - Marker (10), SED (9), AEAD (20), Padding (21)
+//! Miscellaneous packet tests: Marker (10), SED (9), AEAD (20), Padding (21)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

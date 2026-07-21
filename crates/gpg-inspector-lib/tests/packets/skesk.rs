@@ -1,4 +1,4 @@
-//! Symmetric-Key Encrypted Session Key packet tests - Tag 3
+//! Symmetric-Key Encrypted Session Key packet tests (Tag 3)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

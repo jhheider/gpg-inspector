@@ -20,7 +20,7 @@ impl<'a> InputPanel<'a> {
     }
 }
 
-/// Renders to terminal buffer - not unit testable
+/// Renders to terminal buffer, not unit testable
 #[cfg(not(tarpaulin_include))]
 impl Widget for InputPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -102,7 +102,7 @@ impl Widget for InputPanel<'_> {
     }
 }
 
-/// Helper for cursor positioning in render - only called from excluded Widget impl
+/// Helper for cursor positioning in render, only called from excluded Widget impl
 #[cfg(not(tarpaulin_include))]
 fn calculate_cursor_position(text: &str, cursor_pos: usize, width: usize) -> (usize, usize) {
     let before_cursor = &text[..cursor_pos];

@@ -20,7 +20,7 @@ impl<'a> HexPanel<'a> {
     }
 }
 
-/// Renders to terminal buffer - not unit testable
+/// Renders to terminal buffer, not unit testable
 #[cfg(not(tarpaulin_include))]
 impl Widget for HexPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {

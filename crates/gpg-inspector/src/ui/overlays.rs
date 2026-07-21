@@ -60,7 +60,7 @@ const HELP_TEXT: &[(&str, &str)] = &[
     ("?", "Toggle this help (Data/Hex panels)"),
 ];
 
-/// Renders to terminal buffer - not unit testable
+/// Renders to terminal buffer, not unit testable
 #[cfg(not(tarpaulin_include))]
 impl Widget for HelpOverlay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -116,7 +116,7 @@ impl<'a> DetailOverlay<'a> {
     }
 }
 
-/// Renders to terminal buffer - not unit testable
+/// Renders to terminal buffer, not unit testable
 #[cfg(not(tarpaulin_include))]
 impl Widget for DetailOverlay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {

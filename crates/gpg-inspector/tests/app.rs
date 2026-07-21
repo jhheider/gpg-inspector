@@ -216,7 +216,7 @@ fn test_move_selection_scrolls_up() {
     app.selected_line = 5;
     app.data_scroll = 5;
 
-    // Move up - should adjust scroll
+    // Move up; should adjust scroll
     app.move_selection(-3, 10);
     assert_eq!(app.selected_line, 2);
     assert!(app.data_scroll <= 2);

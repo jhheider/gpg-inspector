@@ -1,4 +1,4 @@
-//! Compressed Data packet tests - Tag 8
+//! Compressed Data packet tests (Tag 8)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;

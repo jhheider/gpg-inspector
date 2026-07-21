@@ -18,13 +18,13 @@ use super::Field;
 pub enum DataFormat {
     /// Binary data ('b', 0x62).
     Binary,
-    /// Text data ('t', 0x74) - may need line ending conversion.
+    /// Text data ('t', 0x74), may need line ending conversion.
     Text,
-    /// UTF-8 text ('u', 0x75) - text known to be UTF-8.
+    /// UTF-8 text ('u', 0x75), text known to be UTF-8.
     Utf8,
-    /// MIME format ('m', 0x6D) - RFC 9580.
+    /// MIME format ('m', 0x6D), per RFC 9580.
     Mime,
-    /// Local mode ('l', 0x6C) - deprecated.
+    /// Local mode ('l', 0x6C), deprecated.
     Local,
     /// Unknown format.
     Unknown(u8),

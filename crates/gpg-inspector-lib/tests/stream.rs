@@ -1,4 +1,4 @@
-//! Tests for stream.rs - ByteStream edge cases
+//! Tests for stream.rs: ByteStream edge cases
 
 use gpg_inspector_lib::ByteStream;
 use std::sync::Arc;

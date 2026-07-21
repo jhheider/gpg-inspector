@@ -1,4 +1,4 @@
-//! SEIPD (Symmetrically Encrypted Integrity Protected Data) packet tests - Tag 18
+//! SEIPD (Symmetrically Encrypted Integrity Protected Data) packet tests (Tag 18)
 
 use gpg_inspector_lib::packet::tags::PacketTag;
 use gpg_inspector_lib::parse_bytes;
