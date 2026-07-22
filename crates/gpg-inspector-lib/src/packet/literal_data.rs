@@ -139,7 +139,7 @@ pub fn parse_literal_data(
                     format!(
                         "{} bytes: \"{}...\"",
                         data.len(),
-                        &preview[..60].replace('\n', "\\n")
+                        preview[..60].replace('\n', "\\n")
                     )
                 } else {
                     format!("{} bytes: \"{}\"", data.len(), preview.replace('\n', "\\n"))
