@@ -660,7 +660,7 @@ checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
 
 [[package]]
 name = "gpg-inspector"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "clap",
  "color-eyre",
@@ -674,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "gpg-inspector-lib"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "bzip2",
  "chrono",
