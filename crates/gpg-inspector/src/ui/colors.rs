@@ -173,8 +173,8 @@ impl ColorTracker {
                 if field.indent > 0 {
                     let (start, end) = field.span;
                     if end > start && end <= total_bytes {
-                        for i in start..end {
-                            tracker.byte_colors[i] = Some(color_index);
+                        for slot in &mut tracker.byte_colors[start..end] {
+                            *slot = Some(color_index);
                         }
                     }
                     color_index = (color_index + 1) % 12;
